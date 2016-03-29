@@ -12,7 +12,7 @@ class Slave:
         self.url = config.SLAVE
 
     def load(self, master_hash):
-        if config.CASHE:
+        if config.CACHE:
             # todo count hash of master file if isn't changed
             self.load_cache(master_hash)  # Load from cache and download only missing source
         else:
