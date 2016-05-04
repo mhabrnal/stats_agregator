@@ -4,6 +4,8 @@ import urllib
 import json
 import os.path
 
+import sys
+
 
 class Slave:
     slave_bt = dict()
@@ -14,28 +16,55 @@ class Slave:
     def load(self, master_hash):
         if config.CACHE:
             # todo count hash of master file if isn't changed
-            self.load_cache(master_hash)  # Load from cache and download only missing source
+            # Load from cache and download only missing source
+            self.load_cache(master_hash)
         else:
+            # Helpers variable for testing
+            iteration = 1
+            total = len(master_hash)
+            servers = len(self.url) + 1
+
             for server_name, server_url in self.url.items():
                 # Download from all source
-                result = self.get_ureport_by_hash(master_hash=master_hash, source=server_url)
-                self.slave_bt[server_name] = json.loads(result)
+
+                limit_from = int((iteration - 1) * round(total / servers))
+                limit_to = int(iteration * round(total / servers))
+
+                if False:
+                    limit_from = 0
+                    limit_to = 1
+
+                result = self.get_ureport_by_hash(master_hash=master_hash[limit_from:limit_to],
+                                                  source=server_url)
+
+                parse_json = self.parse_hash_from_json(result)  # TODO REMAKE ??
+
+                self.slave_bt[server_name] = parse_json['RESULT']
+                iteration += 1
 
     def get_ureport_by_hash(self, master_hash, source=None):
         json_result = None
 
         if isinstance(self.url, dict):
             if source is not None:
-                json_result = self.download_data(url=source, data=master_hash)
+                json_result = self.download_data(url=source,
+                                                 data=master_hash)
         return json_result
 
     @staticmethod
     def download_data(url,  data):
-        request_data = urllib.urlencode({'data': json.dumps(data)})
-        request = urllib2.Request(url, request_data)
+        problem_url = url + "problems/multi_bthash/"
+
+        json_data_send = json.dumps(data)
+
+        request = urllib2.Request(problem_url, data=json_data_send,
+                                  headers={"Content-Type": "application/json",
+                                           "Accept": "application/json"})
+
         data = urllib2.urlopen(request)
 
         json_string = data.read()
+
         return json_string
 
     @staticmethod
@@ -63,3 +92,9 @@ class Slave:
                 self.slave_bt[server_name] = json.loads(result)
 
         self.save_cache()
+
+    def print_debug(self):
+        for s_name, s_data in self.slave_bt.items():
+            print "Server " + s_name + ": \n"
+            print s_data
+            print "\n"
