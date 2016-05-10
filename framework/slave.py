@@ -39,7 +39,7 @@ class Slave:
 
                 parse_json = self.parse_hash_from_json(result)  # TODO REMAKE ??
 
-                self.slave_bt[server_name] = parse_json['RESULT']
+                self.slave_bt[server_name] = parse_json
                 iteration += 1
 
     def get_ureport_by_hash(self, master_hash, source=None):

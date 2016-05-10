@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 class Master:
     master_bt = []
     created = None  # Time when was generate master json
-    master_file = "cache/master.json"
+    master_file = "cache/master_small.json"
 
     def __init__(self):
         self.url = config.MASTER
@@ -24,7 +24,7 @@ class Master:
         """
         Download all json from master server.
         """
-        url = self.url + "stats/api/get_hash"
+        url = self.url + "stats/api/get_hash/rhel"
         request = urllib2.Request(url,
                                   headers={"Accept": "application/json"})
         # TODO Send data (os, date interval from - to)
@@ -56,14 +56,21 @@ class Master:
             self.download_all_hash()
 
     def download_ureport(self):
-        from slave import Slave
-        # TODO Invent better solution for this!
-        json_str = Slave.download_data(self.url, self.master_bt)
-        self.master_bt = json.loads(json_str)
+        self.master_file = "cache/master-complete-min.json"
+        if config.CACHE and self.old_cache() and os.path.isfile(self.master_file):
+            self.load_cache()
+        else:
+            from slave import Slave
+            # TODO Invent better solution for this!
+            json_str = Slave.download_data(self.url, self.master_bt)
+            self.master_bt = json.loads(json_str)
+
+            if config.CACHE:
+                self.save_cache()
 
         return True
 
-    def old_cache(self, days=0, hours=3, minutes=0):
+    def old_cache(self, days=10, hours=0, minutes=0):
         """
         If master file is older then parametrized time,
         then delete all cached files.
@@ -90,4 +97,6 @@ class Master:
         """
         files = os.listdir("cache")
         for f in files:
-            os.unlink("cache/" + f)
+            # os.unlink("cache/" + f)
+            # TODO Uncomment please :)
+            pass
