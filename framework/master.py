@@ -24,7 +24,7 @@ class Master:
         """
         Download all json from master server.
         """
-        url = self.url + "stats/api/get_hash/rhel"
+        url = self.url + "stats/api/get_hash/*/*/2016-04-20"
         request = urllib2.Request(url,
                                   headers={"Accept": "application/json"})
         # TODO Send data (os, date interval from - to)
@@ -97,6 +97,6 @@ class Master:
         """
         files = os.listdir("cache")
         for f in files:
-            # os.unlink("cache/" + f)
+            os.unlink("cache/" + f)
             # TODO Uncomment please :)
             pass

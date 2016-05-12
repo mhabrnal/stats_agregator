@@ -53,7 +53,7 @@ class Slave:
 
     @staticmethod
     def download_data(url,  data):
-        problem_url = url + "problems/multi_bthash/"
+        problem_url = url + "reports/items/"
 
         json_data_send = json.dumps(data)
 
@@ -64,7 +64,6 @@ class Slave:
         data = urllib2.urlopen(request)
 
         json_string = data.read()
-
         return json_string
 
     @staticmethod
