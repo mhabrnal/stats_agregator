@@ -31,7 +31,6 @@ if config.VERBOSE:
 slave = Slave()
 slave.load(master_hash=master.master_bt)
 
-
 if config.VERBOSE:
     print "Slave processing stop"
 

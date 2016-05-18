@@ -24,7 +24,7 @@ class Master:
         """
         Download all json from master server.
         """
-        url = self.url + "stats/api/get_hash/*/*/2016-04-20"
+        url = self.url + "stats/api/get_hash/*/*/2015-12-01"
         request = urllib2.Request(url,
                                   headers={"Accept": "application/json"})
         # TODO Send data (os, date interval from - to)
@@ -100,3 +100,13 @@ class Master:
             os.unlink("cache/" + f)
             # TODO Uncomment please :)
             pass
+
+    def download_problems(self, opsys=None ,date_range=None):
+        url = self.url + "problems/?bug_filter=NO_BUGS"
+        if opsys:
+            for os in opsys:
+                url += "&opsys=" + os
+        if date_range:
+            url += "&daterange=" + date_range
+
+        print url
