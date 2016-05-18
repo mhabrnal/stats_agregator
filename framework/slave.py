@@ -5,9 +5,10 @@ import json
 import os.path
 
 import sys
+from aserver import AServer
 
 
-class Slave:
+class Slave(AServer):
     slave_bt = dict()
 
     def __init__(self):

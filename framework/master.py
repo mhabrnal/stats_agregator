@@ -3,9 +3,10 @@ import urllib2
 import json
 import os.path
 from datetime import datetime, timedelta
+from aserver import AServer
 
 
-class Master:
+class Master(AServer):
     master_bt = []
     created = None  # Time when was generate master json
     master_file = "cache/master_small.json"
@@ -109,4 +110,9 @@ class Master:
         if date_range:
             url += "&daterange=" + date_range
 
-        print url
+        request = urllib2.Request(url, headers={"Accept": "application/json"})
+
+        # TODO Send data (os, date interval from - to)
+        json_string = urllib2.urlopen(request).read()
+
+        print json_string

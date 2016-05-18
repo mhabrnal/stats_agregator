@@ -7,7 +7,7 @@ import sys
 # TODO REMOVE ALL NON USED IMPORTS
 # TODO REPAIR CACHING AND IMPLEMENT HASH
 # Download all bt_hash from master server
-
+'''
 if config.VERBOSE:
     if config.CACHE:
         print ("All results will be cached")
@@ -36,3 +36,7 @@ if config.VERBOSE:
 
 core = Core(master=master, slave=slave)
 core.run()
+'''
+
+master = Master()
+master.download_problems(opsys=['CentOs'], date_range="2015-07-31%3A2016-05-18")
