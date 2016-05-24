@@ -4,11 +4,15 @@ from pprint import pprint
 import bugzilla
 import re
 import subprocess
+import os
+from datetime import datetime, timedelta
+from framework.master import Master
+from framework.slave import Slave
 
 class Core:
 
-    master_hash = None
-    slave_hash = None
+    master = None
+    slave = None
     bz_bugs = dict()
     slave_dict = dict()
 
@@ -20,33 +24,50 @@ class Core:
 
     output_message = ""
 
-    def __init__(self, master, slave):
-        self.master_hash = master
-        self.slave_hash = slave
+    def __init__(self):
+        self.master = Master()
+        self.slave = Slave()
+
+    def download_data(self):
+        if config.CACHE and self.old_cache():
+
+            if not self.master.load_cache():
+                self.master.download_all_hash()
+
+            if not self.slave.load_cache():
+                self.slave.download_ureports(self.master.master_bt)
+        else:
+            self.clear_cache()
+            self.master.download_all_hash()
+            self.slave.download_ureports(self.master.master_bt)
 
     def run(self):
+        '''
+        self.download_data()
+
         print "Start working with data"
 
         self.agregate_master_bthash()
-        self.master_hash.download_ureport()  # Download ureports
+        self.master.download_ureport()  # Download ureports
         self.group_data_by_bt_hash()
         self.summarize_data()
 
-        pprint(self.step1.keys())
-        print "================"
-        pprint(self.step2.keys())
-        print "================"
-        pprint(self.step3.keys())
-        print "================"
-        pprint(self.step3.keys())
-        print "================"
+        if config.VERBOSE:
+            pprint(self.step1.keys())
+            print "================"
+            pprint(self.step2.keys())
+            print "================"
+            pprint(self.step3.keys())
+            print "================"
+        '''
 
+        self.master.download_problems(opsys=['CentOS'],
+                                      date_range="2015-07-31%3A2016-05-18")
+
+        self.slave.download_problems(self.master.master_problem)
 
         self.generate_output()
-        sys.exit()
 
-        print "All is done"
-        print self.output_message
         # self.send_data_to_mail()
         sys.exit()
 
@@ -63,7 +84,7 @@ class Core:
         for key_hash, ureports in self.step1.items():
             known_bug_id = []
 
-            master_report = self.master_hash.master_bt[key_hash]
+            master_report = self.master.master_bt[key_hash]
 
             for master_bug in master_report['bugs']:
                 if master_bug['type'] == "BUGZILLA" and master_bug['status'] \
@@ -100,11 +121,10 @@ class Core:
                             self.output_message += "\t- fixed in: {0}\n".format(f_bug.fixed_in)
                         else:
                             self.output_message += "\t- fixed in: -\n"
-        '''
-        '''
+
         # generate output for step2
         for key_hash, ureport in self.step2.items():
-            self.output_message += "\n Probably fixed Bugzilla bugs in RHEL-7\n"
+            self.output_message += "\nProbably fixed Bugzilla bugs in RHEL-7\n"
             for master_bug in ureport['bugs']:
                 if master_bug['type'] == 'BUGZILLA' and master_bug['status'] == 'NEW':
                     bz_bug = bz.getbug(master_bug['id'])
@@ -130,9 +150,9 @@ class Core:
 
 
         # generate output for step3
-        self.output_message += "\n Probably fixed Bugzilla bugs in Fedora\n"
+        self.output_message += "\nProbably fixed Bugzilla bugs in Fedora\n"
         for key_hash, ureport in self.step3.items():  # step 3 contain slave's reports
-            master_report = self.master_hash.master_bt[key_hash]
+            master_report = self.master.master_bt[key_hash]
             for master_bug in master_report['bugs']:
                 if master_bug['type'] == 'BUGZILLA' and master_bug['status'] == 'NEW':
                     bz_bug = bz.getbug(master_bug['id'])
@@ -152,6 +172,8 @@ class Core:
                 self.output_message += "\t- probably fixed in: {0}:{1}-{2}\n".format(pfb['epoch'], pfb['version'],
                                                                                      pfb['release'])
         '''
+        self.output_message += "Traces occurring on RHEL-${0} that are fixed in Fedora".format("7")
+
         print self.output_message
 
     def agregate_master_bthash(self):
@@ -160,15 +182,15 @@ class Core:
         master variable for downloading ureports from master
         """
         correct_bthashes = []
-        for hashes in self.slave_hash.slave_bt.values():
+        for hashes in self.slave.slave_bt.values():
             for slave_bthash in hashes.keys():
                 if slave_bthash not in correct_bthashes:
                     correct_bthashes.append(slave_bthash)
-        self.master_hash.master_bt = correct_bthashes
+        self.master.master_bt = correct_bthashes
 
     def group_data_by_bt_hash(self):
-        for master_bt, master_ureport in self.master_hash.master_bt.items():
-            for server_name, slave_report in self.slave_hash.slave_bt.items():
+        for master_bt, master_ureport in self.master.master_bt.items():
+            for server_name, slave_report in self.slave.slave_bt.items():
                 if master_bt in slave_report:
                     if master_bt not in self.slave_dict:
                         self.slave_dict[master_bt] = []
@@ -191,8 +213,8 @@ class Core:
                 for bug in report['bugs']:
                     if bug['resolution'] in config.BUG_TYPE:
                         # Try to find bugs in master
-                        if 'bugs' in self.master_hash.master_bt[bthash]:
-                            for master_bug in self.master_hash.master_bt[bthash]['bugs']:
+                        if 'bugs' in self.master.master_bt[bthash]:
+                            for master_bug in self.master.master_bt[bthash]['bugs']:
                                 if master_bug['status'] == "NEW" and \
                                         master_bug['type'] == 'BUGZILLA':
                                     atleast_one_new = True
@@ -206,14 +228,14 @@ class Core:
                     self.step1[bthash] = self.slave_dict[bthash]
 
         # Step 2
-        for bthash, report in self.master_hash.master_bt.items():
+        for bthash, report in self.master.master_bt.items():
             if bthash not in self.step1 and report['probably_fixed'] is not None and 'bugs' in report:
                 for bug in report['bugs']:
                     if bug['type'] == 'BUGZILLA' and bug['status'] != 'CLOSED':
                         self.step2[bthash] = report
 
         # Step 3
-        for bthash, report in self.master_hash.master_bt.items():
+        for bthash, report in self.master.master_bt.items():
             if (bthash not in self.step1 and bthash not in self.step2) and 'bugs' in report:
 
                 open_bugzilla = False
@@ -257,5 +279,35 @@ class Core:
         s.quit()
 
     def delete_hash(self, bt_hash):
-        del(self.master_hash.master_bt[bt_hash])
+        del(self.master.master_bt[bt_hash])
         del(self.slave_dict[bt_hash])
+
+    def old_cache(self, days=10, hours=0, minutes=0):
+        """
+        If master file is older then parametrized time,
+        then delete all cached files.
+        By default is set on 3 hours
+        """
+        if os.path.isfile(self.master.master_file):
+            modify_datetime = datetime.fromtimestamp(
+                os.path.getmtime(self.master.master_file))
+            current_datetime = datetime.now()
+
+            result = current_datetime - modify_datetime
+
+            if result.total_seconds() > timedelta(minutes=minutes,
+                                                  hours=hours,
+                                                  days=days).total_seconds():
+                self.clear_cache()
+
+        return True
+
+    @staticmethod
+    def clear_cache():
+        """
+        Delete all cached file
+        """
+        files = os.listdir("cache")
+        for f in files:
+            os.unlink("cache/" + f)
+            print "Delete cache cache/" + f

@@ -3,45 +3,46 @@ import urllib2
 import urllib
 import json
 import os.path
-
+from pprint import pprint
 import sys
 from aserver import AServer
 
 
 class Slave(AServer):
-    slave_bt = dict()
 
     def __init__(self):
         self.url = config.SLAVE
 
-    def load(self, master_hash):
-        if config.CACHE:
-            # todo count hash of master file if isn't changed
-            # Load from cache and download only missing source
-            self.load_cache(master_hash)
-        else:
-            # Helpers variable for testing
-            iteration = 1
-            total = len(master_hash)
-            servers = len(self.url) + 1
+    def download_ureports(self, master_bt):
+        # Helpers variable for testing
+        iteration = 1
+        total = len(master_bt)
+        servers = len(self.url) + 1
 
-            for server_name, server_url in self.url.items():
-                # Download from all source
+        if config.VERBOSE:
+            print "Celkem je {0} master hashu".format(total)
 
-                limit_from = int((iteration - 1) * round(total / servers))
-                limit_to = int(iteration * round(total / servers))
+        for server_name, server_url in self.url.items():
+            # Download from all source
 
-                if False:
-                    limit_from = 0
-                    limit_to = 1
+            limit_from = int((iteration - 1) * round(total / servers))
+            limit_to = int(iteration * round(total / servers))
 
-                result = self.get_ureport_by_hash(master_hash=master_hash[limit_from:limit_to],
-                                                  source=server_url)
+            if True:
+                limit_from = 0
+                limit_to = 100
 
-                parse_json = self.parse_hash_from_json(result)  # TODO REMAKE ??
+            result = self.get_ureport_by_hash(master_hash=master_bt[limit_from:limit_to],
+                                              source=server_url)
 
-                self.slave_bt[server_name] = parse_json
-                iteration += 1
+            parse_json = self.parse_hash_from_json(result)  # TODO REMAKE ??
+
+            self.slave_bt[server_name] = parse_json
+
+            if config.CACHE:
+                self.save_cache(server_name + ".json", parse_json)
+
+            iteration += 1
 
     def get_ureport_by_hash(self, master_hash, source=None):
         json_result = None
@@ -53,48 +54,48 @@ class Slave(AServer):
         return json_result
 
     @staticmethod
-    def download_data(url,  data):
-        problem_url = url + "reports/items/"
-
-        json_data_send = json.dumps(data)
-
-        request = urllib2.Request(problem_url, data=json_data_send,
-                                  headers={"Content-Type": "application/json",
-                                           "Accept": "application/json"})
-
-        data = urllib2.urlopen(request)
-
-        json_string = data.read()
-        return json_string
-
-    @staticmethod
     def parse_hash_from_json(json_string):
         js = json.loads(json_string)
         return js
 
-    def save_cache(self):
-        # save hash of master
-        for fname, json_str in self.slave_bt.items():
-            if json_str is not None:
-                f = open("cache/" + fname + ".json", "w")
-                f.write(json.dumps(json_str))
-                f.close()
-
-    def load_cache(self, master_hash):
+    def load_cache(self):
         for server_name, server_url in self.url.items():
             if os.path.isfile("cache/" + server_name + ".json"):
-                f = open("cache/" + server_name + ".json", "r")
-                for line in f:
-                    self.slave_bt[server_name] = self.parse_hash_from_json(line)
-                f.close()
+                with open("cache/" + server_name + ".json", "r") as f:
+                    for line in f:
+                        self.slave_bt[server_name] = self.parse_hash_from_json(line)
+                return True
             else:
-                result = self.get_ureport_by_hash(master_hash=master_hash, source=server_url)
-                self.slave_bt[server_name] = json.loads(result)
+                return False
 
-        self.save_cache()
+    def get_problem_info(self, problem_bt_hash):
+        for s_name, s_url in self.url.items():
+            problem_url = s_url + "/problems/bthash/?" + problem_bt_hash + "&bth=f3f5e5020c0f69f71c66fe33e47d232435c451a0"
 
-    def print_debug(self):
-        for s_name, s_data in self.slave_bt.items():
-            print "Server " + s_name + ": \n"
-            print s_data
-            print "\n"
+            p_request = urllib2.Request(problem_url, headers={"Accept": "application/json"})
+
+            problem_string = urllib2.urlopen(p_request).read()
+
+            problem = json.loads(problem_string)
+
+            tmp_list = []
+            if "multiple" in problem:
+                for p_id in problem['multiple']:
+                    tmp_list.append(self.get_problem_by_id(s_url, p_id))
+            else:
+                tmp_list.append(problem)
+
+            self.slave_problem[problem_bt_hash] = tmp_list
+
+    def download_problems(self, master_problem):
+        for p in master_problem:
+            self.get_problem_info(p['bt_hash_qs'])
+
+    @staticmethod
+    def get_problem_by_id(s_url, p_id):
+        problem_url = s_url + "/problems/" + str(p_id)
+
+        p_request = urllib2.Request(problem_url, headers={"Accept": "application/json"})
+
+        return json.loads(urllib2.urlopen(p_request).read())
+
