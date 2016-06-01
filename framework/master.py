@@ -2,6 +2,7 @@ import config
 import urllib2
 import json
 import os.path
+import sys
 from datetime import datetime, timedelta
 from aserver import AServer
 from pprint import pprint
@@ -11,17 +12,27 @@ class Master(AServer):
     master_file = "master_small.json"
 
     def __init__(self):
-        self.url = config.MASTER_URL
+        self.url = config.MASTER
 
     def download_all_hash(self):
         """
         Download all json from master server.
         """
+        # get hash have parameters (OS, RELEASE, DATE FROM, DATE TO)
         url = self.url + "stats/api/get_hash/*/*/2015-12-01"
         request = urllib2.Request(url,
                                   headers={"Accept": "application/json"})
-        # TODO Send data (os, date interval from - to)
-        json_string = urllib2.urlopen(request).read()
+
+        try:
+            data = urllib2.urlopen(request)
+        except urllib2.URLError as e:
+            print "{0} - {1}".format(url, e.reason)
+            sys.exit()
+        except urllib2.HTTPError as e:
+            print "Url {0} return code {1}".format(url, e.code)
+            sys.exit()
+
+        json_string = data.read()
 
         self.parse_hash_from_json(json_string=json_string)
 
@@ -57,13 +68,17 @@ class Master(AServer):
 
         return True
 
-    def download_problems(self, opsys=None ,date_range=None):
+    def download_problems(self, opsys=None, date_range=None):
         url = self.url + "problems/?bug_filter=NO_BUGS"
 
-
         if opsys:
-            for os in opsys:
-                url += "&opsys=" + os
+            if isinstance(opsys, list):
+                for os in opsys:
+                    url += "&opsys=" + os.replace(" ", "+")
+            elif isinstance(opsys, basestring):
+                url += "&opsys=" + opsys.replace(" ", "+")
+            else:
+                raise "Unknown attribute for OS!"
         if date_range:
             url += "&daterange=" + date_range
 
@@ -81,3 +96,12 @@ class Master(AServer):
             problem_string = urllib2.urlopen(p_request).read()
 
             self.master_problem.append(json.loads(problem_string))
+
+    @staticmethod
+    def clear_cache():
+        """
+        Delete all cached file
+        """
+        files = os.listdir("cache")
+        for f in files:
+            os.unlink("cache/" + f)

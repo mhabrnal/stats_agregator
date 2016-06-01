@@ -1,18 +1,15 @@
 CACHE = True
 
-MASTER_URL = "http://10.34.24.173/faf/"
+#TODO Disable cache
 
-VERBOSE = True
+MASTER = "http://example.com/faf/"
 
-BUG_TYPE = ['ERRATA']  # Bugzilla bugs with closed Fedora Bugzilla bugs
+BZ_USER = ""
+BZ_PASSWORD = ""
 
-OPSYS = ['CentOS', 'Fedora', 'Red Hat Linux Enterprise']
+SLAVE = {'request_server': "http://example.com/faf/"}
 
-if False:
-    SLAVE = {'request_server_min': "http://10.34.24.108:8080/faf/",
-             'request_server_min_2': "http://10.34.24.108:8080/faf/"
-             }
+# Example for multiple servers
+# SLAVE = {'request_server_min': "http://example.com/faf/",
+#           'request_server_min_2': "http://example1.com/faf/"}
 
-else:
-    SLAVE = {'request_server': "http://10.34.24.173//faf/"}
-    # SLAVE = {'request_server_min': "http://10.34.24.173/faf/"}
