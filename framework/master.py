@@ -96,12 +96,3 @@ class Master(AServer):
             problem_string = urllib2.urlopen(p_request).read()
 
             self.master_problem.append(json.loads(problem_string))
-
-    @staticmethod
-    def clear_cache():
-        """
-        Delete all cached file
-        """
-        files = os.listdir("cache")
-        for f in files:
-            os.unlink("cache/" + f)
