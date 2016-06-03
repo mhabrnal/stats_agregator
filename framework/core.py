@@ -1,5 +1,7 @@
 import config
 import sys
+import pickle
+import json
 from pprint import pprint
 import bugzilla
 import re
@@ -13,6 +15,7 @@ class Core:
 
     master = None
     slave = None
+    bz = None
     bz_bugs = dict()
     slave_dict = dict()
 
@@ -24,12 +27,17 @@ class Core:
     step5 = dict()  # Traces occurring on CentOS-${X} that are fixed in Fedora:
     step6 = dict()  # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
     step7 = dict()  # Traces occurring on CentOS-${X} that are probably fixed in Fedora:
+    #step8 = dict()  # Traces occurring on RHEL-${X} with user details
 
     output_message = ""
 
     def __init__(self):
         self.master = Master()
         self.slave = Slave()
+        self.bz = bugzilla.Bugzilla(url="https://bugzilla.redhat.com/xmlrpc.cgi",
+                                    cookiefile=None)
+
+        self.bz.login(config.BZ_USER, config.BZ_PASSWORD)
 
     def download_data(self):
         if config.CACHE and self.old_cache():
@@ -53,6 +61,7 @@ class Core:
         self.master.download_ureport()  # Download ureports
         self.group_data_by_bt_hash()
         self.summarize_data()
+        self.load_bugs()
 
         # Save master data to cache
         if os.path.isfile("cache/master_problem.json") and config.CACHE:
@@ -74,6 +83,7 @@ class Core:
                 self.slave.save_cache("slave_problem.json", self.slave.slave_problem)
 
         self.generate_output()
+        self.save_bugs()
 
         # self.send_data_to_mail()
 
@@ -81,10 +91,6 @@ class Core:
 
     def generate_output(self):
         # TODO Implement cache of bz bugs
-        bz = bugzilla.Bugzilla(url="https://bugzilla.redhat.com/xmlrpc.cgi",
-                               cookiefile=None)
-        bz.login(config.BZ_USER, config.BZ_PASSWORD)
-
         if self.step1:
             self.output_message += "RHEL-{0}.{1} Bugzilla bugs with closed Fedora Bugzilla " \
                                    "bugs:\n".format("7", "x")
@@ -98,7 +104,7 @@ class Core:
                     if master_bug['type'] == "BUGZILLA" and master_bug['status'] \
                             == 'NEW':  # TODO remove TYPE VERIFICATION
 
-                        bz_bug = bz.getbug(master_bug['id'])
+                        bz_bug = self.get_bzbug(master_bug['id'])
 
                         self.output_message += "* {0}: #{1} - [{2}] - {3}\n".format(bz_bug.product,
                                                                                     master_bug['id'],
@@ -119,7 +125,7 @@ class Core:
                     for fedora_bug in ureport['bugs']:
                         if fedora_bug['status'] == 'CLOSED' and fedora_bug['id'] \
                                 not in known_bug_id:
-                            f_bug = bz.getbug(fedora_bug['id'])
+                            f_bug = self.get_bzbug(fedora_bug['id'])
                             known_bug_id.append(fedora_bug['id'])
                             self.output_message += "  {0}: #{1} - [{2}] - {3}\n".format(f_bug.product,
                                                                                         fedora_bug['id'],
@@ -136,7 +142,7 @@ class Core:
             for key_hash, ureport in self.step2.items():
                 for master_bug in ureport['bugs']:
                     if master_bug['type'] == 'BUGZILLA' and master_bug['status'] == 'NEW':
-                        bz_bug = bz.getbug(master_bug['id'])
+                        bz_bug = self.get_bzbug(master_bug['id'])
 
                         self.output_message += "* #{0} - [{1}] - {2}\n".format(master_bug['id'], bz_bug.component, bz_bug.summary)
 
@@ -167,7 +173,7 @@ class Core:
                 # TODO: add 'component' to 'packate_counts' in FAF
 
                 for b in bugs:
-                    bz_bug = bz.getbug(b['id'])
+                    bz_bug = self.get_bzbug(b['id'])
                     self.output_message += "* #{0} - [{1}] - {2}\n".format(bz_bug.id, master_report['component'], bz_bug.summary)
 
                     self.output_message += "* #{0} - [{1}] - {2}\n".format(master_bug['id'], master_report['component'],
@@ -191,7 +197,7 @@ class Core:
                 master_report = self.master.master_bt[key_hash]
 
                 for sb in slave_bug:
-                    bz_bug = bz.getbug(sb['id'])
+                    bz_bug = self.get_bzbug(sb['id'])
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
                     self.output_message += "\t - fixed in: {0}\n".format(bz_bug.fixed_in)
                     last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
@@ -208,7 +214,7 @@ class Core:
                 master_report = self.master.master_bt[key_hash]
 
                 for sb in slave_bug:
-                    bz_bug = bz.getbug(sb['id'])
+                    bz_bug = self.get_bzbug(sb['id'])
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
                     self.output_message += "\t - fixed in: {0}\n".format(bz_bug.fixed_in)
                     last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
@@ -417,6 +423,28 @@ class Core:
                 self.clear_cache()
 
         return True
+
+    def get_bzbug(self, id):
+        if id in self.bz_bugs:
+            bug = self.bz_bugs[id]
+        else:
+            bug = self.bz.getbug(id)
+            self.bz_bugs[id] = bug
+        return bug
+
+    def load_bugs(self):
+        if os.path.isfile("cache/bugtilla_bug"):
+            with open("cache/bugzilla_bug", "rb") as f:
+                try:
+                    self.bz_bugs = pickle.load(f)
+                except pickle.UnpicklingError as e:
+                    print "{0}".format(e.message)
+                    exit()
+
+    def save_bugs(self):
+        with open("cache/bugzilla_bug", "wb") as f:
+            f.write(pickle.dumps(self.bz_bugs))
+            # json.dumps(self.bz_bugs)
 
     @staticmethod
     def clear_cache():
