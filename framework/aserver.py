@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 import json
 import urllib2
 import os
+import sys
 
 
 class AServer:
@@ -55,8 +56,12 @@ class AServer:
         request = urllib2.Request(problem_url, data=json_data_send,
                                   headers={"Content-Type": "application/json",
                                            "Accept": "application/json"})
+        try:
+            data = urllib2.urlopen(request)
+        except urllib2.HTTPError as e:
+            print "While tring download '" + problem_url + "' we get error code: " + str(e.code)
+            sys.exit()
+        else:
+            json_string = data.read()
 
-        data = urllib2.urlopen(request)
-
-        json_string = data.read()
         return json_string

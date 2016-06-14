@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from aserver import AServer
 from pprint import pprint
 
+
 class Master(AServer):
 
     master_file = "master_small.json"
@@ -19,7 +20,7 @@ class Master(AServer):
         Download all json from master server.
         """
         # get hash have parameters (OS, RELEASE, DATE FROM, DATE TO)
-        url = self.url + "stats/api/get_hash/*/*/2015-12-01"
+        url = self.url + "reports/get_hash/*/*/2015-12-01"
         request = urllib2.Request(url,
                                   headers={"Accept": "application/json"})
 
@@ -56,7 +57,7 @@ class Master(AServer):
             return False
 
     def download_ureport(self):
-        self.master_file = "master-complete-min.json"
+        self.master_file = "master-complete.json"
         if config.CACHE and os.path.isfile("cache/" + self.master_file):
             self.load_cache()
         else:
@@ -85,7 +86,16 @@ class Master(AServer):
         request = urllib2.Request(url, headers={"Accept": "application/json"})
 
         # TODO Send data (os, date interval from - to)
-        json_string = urllib2.urlopen(request).read()
+        try:
+            data = urllib2.urlopen(request)
+        except urllib2.URLError as e:
+            print "{0} - {1}".format(url, e.reason)
+            sys.exit()
+        except urllib2.HTTPError as e:
+            print "Url {0} return code {1}".format(url, e.code)
+            sys.exit()
+
+        json_string = data.read()
 
         pure_data = json.loads(json_string)
 

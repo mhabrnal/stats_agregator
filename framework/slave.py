@@ -98,7 +98,7 @@ class Slave(AServer):
             try:
                 problem_request = urllib2.urlopen(p_request)
             except urllib2.HTTPError as e:
-                print "While tring download " + problem_url + "we get code: " + str(e.code)
+                print "While tring download '" + problem_url + "' we get code: " + str(e.code)
                 continue
             else:
                 problem_string = problem_request.read()
