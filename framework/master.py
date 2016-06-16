@@ -85,7 +85,6 @@ class Master(AServer):
 
         request = urllib2.Request(url, headers={"Accept": "application/json"})
 
-        # TODO Send data (os, date interval from - to)
         try:
             data = urllib2.urlopen(request)
         except urllib2.URLError as e:
