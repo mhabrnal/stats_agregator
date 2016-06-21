@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 from framework.master import Master
 from framework.slave import Slave
-
+from framework.utils import *
 
 class Core:
 
@@ -56,40 +56,19 @@ class Core:
             self.slave.download_ureports(self.master.master_bt)
 
     def run(self):
+
         self.download_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
+        self.load_bugs()  # TODO REWRITE TO BINARY CACHE
         self.group_data_by_bt_hash()
         self.summarize_data()
-        self.load_bugs()
-
-        # Save master data to cache
-        if os.path.isfile("cache/master_problem.json") and config.CACHE:
-            # Load
-            self.master.master_problem = self.master.fast_load("master_problem.json")
-        else:
-            self.master.download_problems(opsys=config.OPSYS[2],
-                                          date_range="2015-07-31%3A2016-05-18")
-            if config.CACHE:
-                self.master.save_cache("master_problem.json", self.master.master_problem)
-
-        if os.path.isfile("cache/slave_problem.json") and config.CACHE:
-            # Load
-            self.slave.slave_problem = self.slave.fast_load("slave_problem.json")
-        else:
-            self.slave.download_problems(self.master.master_problem)
-
-            if config.CACHE:
-                self.slave.save_cache("slave_problem.json", self.slave.slave_problem)
-
-        print "Sorting.."
-
         self.sort_by_count()
         self.generate_output()
         self.save_bugs()
 
-        # self.send_data_to_mail()
-        sys.exit()
+        #self.send_data_to_mail()
+
 
     def generate_output(self):
         if self.step1:
@@ -135,7 +114,7 @@ class Core:
 
                         for b in bugs:
                             bz_bug = self.get_bzbug(b['id'])
-                            self.output_message += "\t- https://bugzilla.redhat.com/show_bug.cgi?id={0} - {1}\n".format(bz_bug.id, bz_bug.status)
+                            self.output_message += self.bugzilla_url(bz_bug)
 
                 for ureport in ureports:
                     for fedora_bug in ureport['bugs']:
@@ -153,8 +132,7 @@ class Core:
                             else:
                                 self.output_message += "\t- fixed in:                           -\n"
 
-                            self.output_message += "\t- https://bugzilla.redhat.com/show_bug.cgi?id={0} - {1}\n".format(f_bug.id, f_bug.status)
-
+                            self.output_message += self.bugzilla_url(f_bug)
         # generate output for step2
         if self.step2:
             self.output_message += "\nProbably fixed Bugzilla bugs in RHEL-7\n"
@@ -202,7 +180,8 @@ class Core:
 
                 for b in bugs:
                     bz_bug = self.get_bzbug(b['id'])
-                    self.output_message += "\t- https://bugzilla.redhat.com/show_bug.cgi?id={0} - {1}\n".format(bz_bug.id, bz_bug.status)
+
+                    self.output_message += self.bugzilla_url(bz_bug)
 
                 self.output_message += "\n"
 
@@ -228,35 +207,42 @@ class Core:
 
                 bugs = [b for b in master_report['bugs'] if b['type'] == 'BUGZILLA' and b['status'] in ('NEW', 'ASSIGNED')]
 
+                correct_bug = True
                 for b in bugs:
                     bz_bug = self.get_bzbug(b['id'])
-                    self.output_message += "*[{0}] - {1}\n".format(master_report['component'], bz_bug.summary)
+                    if bz_bug.status not in ['NEW', 'ASSIGNED']:
+                        correct_bug = False
+                        continue
 
-                self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                    last_version, first_version)
+                    self.output_message += "*[{0}] - {1} --- {2}\n".format(master_report['component'], bz_bug.summary, key_hash)
 
-                self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
-                    first_occurrence.strftime("%Y-%m-%d"),
-                    last_occurrence.strftime("%Y-%m-%d"),
-                    date_diff)
+                if correct_bug:
+                    self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
+                        last_version, first_version)
 
-                self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
-                    master_report['report']['count'], master_report['avg_count_per_month'])
+                    self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
+                        first_occurrence.strftime("%Y-%m-%d"),
+                        last_occurrence.strftime("%Y-%m-%d"),
+                        date_diff)
 
-                bugs = [bug for bug in master_report['bugs'] if bug['type'] == "BUGZILLA"
-                        and bug['status'] in ['NEW']]
+                    self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
+                        master_report['report']['count'], master_report['avg_count_per_month'])
 
-                pf = [r['probably_fixed'] for r in self.slave_dict[key_hash] if r['probably_fixed'] is not None]
-                pfb = pf[0]['probable_fix_build']
-                self.output_message += "\t- probably fixed in:                  {0}:{1}-{2}\n".format(pfb['epoch'], pfb['version'],
-                                                                                                         pfb['release'])
+                    for b in bugs:
+                        bz_bug = self.get_bzbug(b['id'])
+                        self.output_message += self.bugzilla_url(bz_bug)
 
-                for b in bugs:
-                    bz_bug = self.get_bzbug(b['id'])
-                    self.output_message += "\t- https://bugzilla.redhat.com/show_bug.cgi?id={0} - {1}\n".format(bz_bug.id, bz_bug.status)
+                    sr = [s for s in self.slave_dict[key_hash] if s['probably_fixed'] is not None]
+                    for s in sr:
+                        pfb = s['probably_fixed']['probable_fix_build']
+                        self.output_message += "\t- Fedora probably fixed in:                  {0}:{1}-{2}\n".format(pfb['epoch'], pfb['version'],
+                                                                                                                 pfb['release'])
 
-                self.output_message += "\n"
-        # Resolved Fedora Bugzilla bugs appearing in RHEL-7
+                        self.output_message += "\t- {0}reports/{1}\n".format(s['source'], s['report']['id'])
+
+                    self.output_message += "\n"
+
+        # Resolved Fedora Bugzilla bugs appearing in RHEL-X
         if self.step4:
             self.output_message += "\nResolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
             for key_hash, ureport in self.step4.items():
@@ -307,11 +293,12 @@ class Core:
                         self.output_message += "\t- Fedora fixed in:                     {0}\n".format(bz_bug.fixed_in)
                         last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
 
-                        self.output_message += "\t- {0}reports/{1}\n\n".format(s['source'], s['report']['id'])
+                        self.output_message += self.bugzilla_url(bz_bug)
+                        self.output_message += "\n"
 
         # Traces occurring on CentOS${X} that are fixed in Fedora:
         if self.step5:
-            self.output_message += "\nTraces occurring on CentOS-${0} that are fixed in Fedora\n".format("7")
+            self.output_message += "\nTraces occurring on CentOS-{0} that are fixed in Fedora\n".format("7")
             for key_hash, ureport in self.step5.items():
                 slave_bug = [sb for sb in self.slave_dict[key_hash][0]['bugs'] if
                              sb['type'] == "BUGZILLA" and sb['resolution'] in ['ERRATA']]
@@ -349,11 +336,11 @@ class Core:
                     self.output_message += "\t - fixed in: {0}\n".format(bz_bug.fixed_in)
                     last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t - last affected version: {0}\n".format(last_version)
-                    self.output_message += "\t - {0}reports/{1}\n\n".format(self.master.url, ureport['report']['id'])
+                    self.output_message += self.bugzilla_url(bz_bug)
 
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         if self.step6:
-            self.output_message += "\nTraces occurring on RHEL-${0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "\nTraces occurring on RHEL-{0} that are probably fixed in Fedora\n".format("7")
             for key_hash, ureport in self.step6.items():
 
                 slave_pf = [spf for spf in self.slave_dict[key_hash] if spf['probably_fixed'] is not None]
@@ -379,9 +366,8 @@ class Core:
 
                 for spf in slave_pf:
                     pf = spf['probably_fixed']['probable_fix_build']
-                    summary = ""
 
-                    self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], summary)
+                    self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
                         last_version, first_version)
@@ -402,6 +388,7 @@ class Core:
                         master_report['report']['id'])
 
                     self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(pf['nvr'])
+
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
 
         # Traces occurring on CentOS-${0} that are probably fixed in Fedora
@@ -430,7 +417,7 @@ class Core:
                     continue
 
                 for spf in slave_pf:
-                    self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], key_hash)
+                    self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
                         last_version, first_version)
@@ -455,7 +442,7 @@ class Core:
                                                                                           pf['release'])
                     last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t- last affected version: {0}\n".format(last_version)
-                    self.output_message += "\t- {0}reports/{1}\n\n".format(self.master.url, ureport['report']['id'])
+                    self.output_message += "\t- {0}reports/{1}\n\n".format(self.master.url, ureport['report']['id'])# NA BZ
 
         # Fedora Bugzilla bugs and CentOS bugs appearing in RHEL-7
         if self.step8:
@@ -479,7 +466,7 @@ class Core:
                 if master_report['avg_count_per_month'] <= 0:
                     continue
 
-                self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['error_name'])
+                self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                 self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
                     last_version, first_version)
@@ -497,11 +484,26 @@ class Core:
 
                 for spf in slave_pf:
                     last_slave_version = self.get_lastes_version(spf['package_counts'], master_report['component'])
-                    self.output_message += "\t- last Fedora affected version:       {0}\n".format(last_slave_version)
+                    first_slave_version = self.get_first_version(spf['package_counts'], master_report['component'])
+
+                    first_slave_occurrence = self.json_to_date(spf['report']['first_occurrence'])
+                    last_slave_occurrence = self.json_to_date(spf['report']['last_occurrence'])
+
+                    slave_date_diff = self.date_diff(first_slave_occurrence, last_slave_occurrence)
+
+                    spf['avg_count_per_month'] = "count on fedora server" # TODO Remove afver fedora faf server update
+
+                    self.output_message += "\t- first/last affected Fedora version: {0}/{1}\n".format(first_slave_version, last_slave_version)
+
+                    self.output_message += "\t- first / last Fedora occurrence:     {0}/{1} ({2})\n".format(first_slave_occurrence.strftime("%Y-%m-%d"), last_slave_occurrence.strftime("%Y-%m-%d"), slave_date_diff)
+
+                    self.output_message += "\t- Fedora total count:                 {0} (~{1}/month)\n".format(spf['report']['count'], spf['avg_count_per_month'])
+
                     for bug in spf['bugs']:
                         if bug['type'] == "BUGZILLA":
                             bz_bug = self.get_bzbug(bug['id'])
-                            self.output_message += "\t- https://bugzilla.redhat.com/show_bug.cgi?id={0} - {1}\n".format(bz_bug.id, bz_bug.status)
+                            self.output_message += self.bugzilla_url(bz_bug)
+
                         elif bug['type'] == "MANTIS":
                             # TODO implement mantis api
                             pass
@@ -524,6 +526,9 @@ class Core:
 
     def group_data_by_bt_hash(self):
         for master_bt, master_ureport in self.master.master_bt.items():
+            if master_ureport['report']['component'] == "will-crash":
+                self.delete_bthash(master_bt)
+                continue
             for server_name, slave_report in self.slave.slave_bt.items():
                 if master_bt in slave_report:
                     if master_bt not in self.slave_dict:
@@ -587,6 +592,7 @@ class Core:
                     continue
 
                 bugs = [b for b in ureport['bugs'] if b['type'] == 'BUGZILLA' and b['status'] in ('NEW', 'ASSIGNED')]
+
                 if not bugs:
                     continue
 
@@ -741,12 +747,30 @@ class Core:
             f.write(pickle.dumps(self.bz_bugs))
 
     def load_steps(self):
-        #TODO
-        pass
+        all_correct = True
+        for i in range(1, 9):
+            bd = load_binary_cache("step_{0}.p".format(i))
+
+            if bd is None:
+                all_correct = False
+            else:
+                setattr(self, "step" + str(i), bd)
+
+        if not all_correct:
+            self.reset_steps()
+            for i in range(1, 9):
+                delete_cache_file("step_{0}.p".format(i))
+
+        return all_correct
 
     def save_steps(self):
-        #TODO
-        pass
+        for i in range(1, 9):
+            step = getattr(self, "step" + str(i))
+            save_binary_cache("step_{0}.p".format(i), step)
+
+    def reset_steps(self):
+        for i in range(1, 9):
+            setattr(self, "step" + str(i), {})
 
     def sort_by_count(self):
         for i in range(1, 9):
@@ -803,7 +827,16 @@ class Core:
 
     @staticmethod
     def json_to_date(json_date):
-        return datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S.%f')
+        try:
+            d = datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S.%f')
+        except:
+            try:
+                d = datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S')
+            except ValueError:
+                print "time data does not match allowed format."
+
+        return d
+
 
     @staticmethod
     def date_diff(first, last):
@@ -844,3 +877,14 @@ class Core:
         process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
 
         return process.communicate()[0].split()[0]
+
+    @staticmethod
+    def bugzilla_url(bz_bug):
+        status = bz_bug.status
+        if bz_bug.status == "CLOSED":
+            status += " {0}".format(bz_bug.resolution)
+
+        return "\t- https://bugzilla.redhat.com/{0} - {1}\n".format(bz_bug.id, status)
+
+    def delete_bthash(self, bt_hash):
+        del(self.master.master_bt[bt_hash])
