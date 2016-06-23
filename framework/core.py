@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from framework.master import Master
 from framework.slave import Slave
 from framework.utils import *
+from pkg_resources import parse_version
 
 class Core:
 
@@ -67,8 +68,7 @@ class Core:
         self.generate_output()
         self.save_bugs()
 
-        #self.send_data_to_mail()
-
+        self.send_data_to_mail()
 
     def generate_output(self):
         if self.step1:
@@ -101,7 +101,7 @@ class Core:
                         self.output_message += "* {0}: [{1}] - {2}\n".format(bz_bug.product, bz_bug.component,
                                                                              bz_bug.summary)
 
-                        self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(last_version, first_version)
+                        self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(first_version, last_version)
                         self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(first_occurrence.strftime("%Y-%m-%d"),
                                                                                      last_occurrence.strftime("%Y-%m-%d"),
                                                                                      date_diff)
@@ -161,7 +161,7 @@ class Core:
                         self.output_message += "* [{0}] - {1}\n".format(bz_bug.component, bz_bug.summary)
 
                         self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                            last_version, first_version)
+                            first_version, last_version)
                         self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                             first_occurrence.strftime("%Y-%m-%d"),
                             last_occurrence.strftime("%Y-%m-%d"),
@@ -214,11 +214,11 @@ class Core:
                         correct_bug = False
                         continue
 
-                    self.output_message += "*[{0}] - {1} --- {2}\n".format(master_report['component'], bz_bug.summary, key_hash)
+                    self.output_message += "*[{0}] - {1}\n".format(master_report['component'], bz_bug.summary)
 
                 if correct_bug:
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                        last_version, first_version)
+                        first_version, last_version)
 
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
@@ -278,7 +278,7 @@ class Core:
                         self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
 
                         self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                            last_version, first_version)
+                            first_version, last_version)
 
                         self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                             first_occurrence.strftime("%Y-%m-%d"),
@@ -324,14 +324,12 @@ class Core:
                 if avg_month_counter <= 0:
                     continue
 
-
                 for sb in slave_bug:
                     bz_bug = self.get_bzbug(sb['id'])
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
 
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                        last_version, first_version)
-
+                        first_version, last_version)
 
                     self.output_message += "\t - fixed in: {0}\n".format(bz_bug.fixed_in)
                     last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
@@ -370,7 +368,7 @@ class Core:
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                        last_version, first_version)
+                        first_version, last_version)
 
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
@@ -420,7 +418,7 @@ class Core:
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                     self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                        last_version, first_version)
+                        first_version, last_version)
 
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
@@ -469,7 +467,7 @@ class Core:
                 self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
                 self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
-                    last_version, first_version)
+                    first_version, last_version)
 
                 self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                     first_occurrence.strftime("%Y-%m-%d"),
@@ -490,8 +488,6 @@ class Core:
                     last_slave_occurrence = self.json_to_date(spf['report']['last_occurrence'])
 
                     slave_date_diff = self.date_diff(first_slave_occurrence, last_slave_occurrence)
-
-                    spf['avg_count_per_month'] = "count on fedora server" # TODO Remove afver fedora faf server update
 
                     self.output_message += "\t- first/last affected Fedora version: {0}/{1}\n".format(first_slave_version, last_slave_version)
 
@@ -795,7 +791,7 @@ class Core:
         last_version = ""
         for item in package_counts:
             if re.search("^" + component, item[0]):
-                item[-1].sort(key=lambda x: x[0].decode())
+                item[-1].sort(key=lambda x: parse_version(x[0]), reverse=True)
                 last_version = item[-1][0][0]
 
         return last_version
@@ -805,7 +801,7 @@ class Core:
         first_version = ""
         for item in package_counts:
             if re.search("^" + component, item[0]):
-                item[-1].sort(key=lambda x: x[0], reverse=True)
+                item[-1].sort(key=lambda x: parse_version(x[0]))
                 first_version = item[-1][0][0]
 
         return first_version
