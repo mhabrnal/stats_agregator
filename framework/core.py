@@ -68,7 +68,7 @@ class Core:
         self.generate_output()
         self.save_bugs()
 
-        self.send_data_to_mail()
+        #self.send_data_to_mail()
 
     def generate_output(self):
         if self.step1:
@@ -537,7 +537,7 @@ class Core:
         # Bugzilla bugs with closed Fedora Bugzilla bugs
         # Step 1
         for bthash, value in self.slave_dict.items():
-            if bthash in self.step1:
+            if bthash in self.already_processed:
                 continue  # Data will be filled in next step
 
             for report in value:
@@ -545,12 +545,12 @@ class Core:
                     continue  # Don't iterate reports without bugs
                 # Search bugzilla bug with closed fedora bugzilla bug
                 for bug in report['bugs']:
-                    if bug['resolution'] in config.BUG_TYPE:
+                    if (bug['status'] == "CLOSED" and bug['resolution'] in ['ERRATA']) or bug['status'] in ['VERIFIED', 'RELEASE_PENDING']:
                         # Try to find bugs in master
                         if 'bugs' in self.master.master_bt[bthash]:
                             for master_bug in self.master.master_bt[bthash]['bugs']:
                                 # what about ASSIGNED bugs? will those be included?
-                                if master_bug['status'] == "NEW" and master_bug['type'] == 'BUGZILLA':
+                                if master_bug['status'] in ['NEW', 'ASSIGNED'] and master_bug['type'] == 'BUGZILLA':
                                     atleast_one_new = True
                     else:
                         all_bugs_closed = False
@@ -564,10 +564,10 @@ class Core:
         for bthash, report in self.master.master_bt.items():
             if bthash not in self.already_processed and report['probably_fixed'] is not None and 'bugs' in report:
                 for bug in report['bugs']:
-                    if bug['type'] == 'BUGZILLA' and bug['status'] != 'CLOSED':
+                    if bug['type'] == 'BUGZILLA' and (bug['status'] != 'CLOSED' and bug['status'] in ['NEW', 'ASSIGNED']):
                         first_occurrence = self.json_to_date(report['report']['first_occurrence'])
                         last_occurrence = self.json_to_date(report['report']['last_occurrence'])
-
+                        # TODO Is this rly need??
                         avg_month_counter = int(
                             round(report['report']['count'] / self.get_mount_count(first_occurrence, last_occurrence)))
 
@@ -608,7 +608,7 @@ class Core:
                     if 'bugs' not in s:
                         continue
 
-                    bugs = [b for b in s['bugs'] if b['type'] == "BUGZILLA" and b['status'] in ['CLOSED'] and b['resolution'] in ['ERRATA']]  # ON_QA, MODIFIED, VERIFIED
+                    bugs = [b for b in s['bugs'] if b['type'] == "BUGZILLA" and ((b['status'] in ['CLOSED'] and b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']) or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))]  # ON_QA, MODIFIED, VERIFIED
                     if not bugs:
                         continue
 
@@ -628,7 +628,7 @@ class Core:
                         continue
 
                     bugs = [b for b in s['bugs'] if
-                            b['type'] == "BUGZILLA" and b['status'] in ['CLOSED'] and b['resolution'] in ['ERRATA']]
+                            b['type'] == "BUGZILLA" and ((b['status'] in ['CLOSED'] and b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']) or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))] # TODO RLY BUGZILLA?
                     if not bugs:
                         continue
 
