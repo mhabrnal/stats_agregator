@@ -14,6 +14,7 @@ from framework.slave import Slave
 from framework.utils import *
 from pkg_resources import parse_version
 
+
 class Core:
 
     master = None
@@ -57,10 +58,10 @@ class Core:
             self.slave.download_ureports(self.master.master_bt)
 
     def run(self):
+        self.load_bugs()  # TODO REWRITE TO BINARY CACHE
         self.download_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
-        self.load_bugs()  # TODO REWRITE TO BINARY CACHE
         self.group_data_by_bt_hash()
         self.summarize_data()
         self.sort_by_count()
@@ -71,7 +72,7 @@ class Core:
             step = getattr(self, "step" + str(i))
             print "Step {0} have {1} items".format(i, len(step))
 
-        #self.send_data_to_mail()
+        self.send_data_to_mail()
 
     def generate_output(self):
         if self.step1:
@@ -87,8 +88,8 @@ class Core:
 
                         bz_bug = self.get_bzbug(master_bug['id'])
 
-                        last_version = self.get_lastes_version(master_report['package_counts'], "tracker") # bz_bug.component
-                        first_version = self.get_first_version(master_report['package_counts'], "tracker") # bz_bug.component
+                        last_version = self.get_lastes_version(master_report['package_counts'], bz_bug.component)
+                        first_version = self.get_first_version(master_report['package_counts'], bz_bug.component)
 
                         first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
                         last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
@@ -251,11 +252,11 @@ class Core:
         if self.step4:
             self.output_message += "\nResolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
             for key_hash, ureport in self.step4.items():
-
                 slave = []
                 for sl in self.slave_dict[key_hash]:
                     for sb in sl['bugs']:
-                        if sb['type'] == "BUGZILLA" and sb['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']:
+                        if sb['status'] == "CLOSED" and sb['type'] == "BUGZILLA" \
+                                and sb['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']:
                             slave.append(sl)
 
                 if not slave:
@@ -280,8 +281,8 @@ class Core:
                 for s in slave:
                     for sb in s['bugs']:
                         bz_bug = self.get_bzbug(sb['id'])
-                        if bz_bug:
-                            self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
+                        if bz_bug and bz_bug.status == 'CLOSED' and bz_bug.resolution in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']:
+                            self.output_message += "* [{0}] - {1} - {2}\n".format(master_report['report']['component'], bz_bug.summary, key_hash)
 
                             self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
                                 first_version, last_version)
@@ -454,9 +455,13 @@ class Core:
                     self.output_message += "\t- {0}reports/{1}\n\n".format(self.master.url, ureport['report']['id'])# NA BZ
 
         # Fedora Bugzilla bugs and CentOS bugs appearing in RHEL-7
+        step_count_8 = 0
         if self.step8:
             self.output_message += "\nFedora Bugzilla bugs and CentOS bugs appearing in RHEL-{0}\n".format("7")
             for key_hash, ureport in self.step8.items():
+                if step_count_8 >= 20:
+                    continue
+
                 slave_pf = [spf for spf in self.slave_dict[key_hash]]  # if spf['probably_fixed'] is not None
 
                 master_report = self.master.master_bt[key_hash]
@@ -509,13 +514,15 @@ class Core:
                     for bug in spf['bugs']:
                         if bug['type'] == "BUGZILLA":
                             bz_bug = self.get_bzbug(bug['id'])
+                            if not bz_bug:
+                                continue
                             self.output_message += self.bugzilla_url(bz_bug)
 
                         elif bug['type'] == "MANTIS":
                             # TODO implement mantis api
                             pass
                 self.output_message += "\n"
-
+                step_count_8 += 1
         print self.output_message
 
     def agregate_master_bthash(self):
@@ -639,7 +646,9 @@ class Core:
                         continue
 
                     bugs = [b for b in s['bugs'] if
-                            b['type'] == "BUGZILLA" and ((b['status'] in ['CLOSED'] and b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']) or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))] # TODO RLY BUGZILLA?
+                            b['type'] == "BUGZILLA" and ((b['status'] in ['CLOSED'] and
+                                                          b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE'])
+                                                         or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))] # TODO RLY BUGZILLA?
                     if not bugs:
                         continue
 
@@ -684,19 +693,28 @@ class Core:
             if bthash in self.already_processed:
                 continue
 
-            if len(ureport['report']['bugs']) == 0 and ureport['report']['count'] > 200:
+            if len(ureport['report']['bugs']) == 0 and ureport['report']['count'] > 0:
                 for s in self.slave_dict[bthash]:
                     if 'bugs' not in s:
                         continue
-                    '''
-                    bugs = [b for b in s['bugs'] if
-                            b['type'] == "BUGZILLA" and b['status'] in ['NEW']]
-                    if not bugs:
+
+                    valid = False
+                    for bug in s['bugs']:
+                        if bug['type'] != "BUGZILLA":
+                            continue
+
+                        bz_bug = self.get_bzbug(bug['id'])
+                        if not bz_bug:
+                            continue
+
+                        if bz_bug.resolution not in ['EOL', 'NOTABUG', 'INSUFFICIENT_DATA', 'CANTFIX', 'WONTFIX',
+                                                     'DEFFERRED', 'WORKSFORME', 'DUPLICATED', '']:
+                            valid = True
+
+                    if not valid:
                         continue
-                    '''
 
                     self.step8[bthash] = ureport
-                    # self.already_processed.append(bthash)
 
     def send_data_to_mail(self):
         import smtplib
@@ -739,6 +757,7 @@ class Core:
             try:
                 bug = self.bz.getbug(id)
                 self.bz_bugs[id] = bug
+                print "Bug {0} was downloaded".format(id)
             except:
                 return False
 
@@ -747,7 +766,7 @@ class Core:
         return bug
 
     def load_bugs(self):
-        if os.path.isfile("cache/bugtilla_bug"):
+        if os.path.isfile("cache/bugzilla_bug"):
             with open("cache/bugzilla_bug", "rb") as f:
                 try:
                     self.bz_bugs = pickle.load(f)
@@ -758,32 +777,6 @@ class Core:
     def save_bugs(self):
         with open("cache/bugzilla_bug", "wb") as f:
             f.write(pickle.dumps(self.bz_bugs))
-
-    def load_steps(self):
-        all_correct = True
-        for i in range(1, 9):
-            bd = load_binary_cache("step_{0}.p".format(i))
-
-            if bd is None:
-                all_correct = False
-            else:
-                setattr(self, "step" + str(i), bd)
-
-        if not all_correct:
-            self.reset_steps()
-            for i in range(1, 9):
-                delete_cache_file("step_{0}.p".format(i))
-
-        return all_correct
-
-    def save_steps(self):
-        for i in range(1, 9):
-            step = getattr(self, "step" + str(i))
-            save_binary_cache("step_{0}.p".format(i), step)
-
-    def reset_steps(self):
-        for i in range(1, 9):
-            setattr(self, "step" + str(i), {})
 
     def sort_by_count(self):
         for i in range(1, 9):
@@ -846,7 +839,7 @@ class Core:
             try:
                 d = datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S')
             except ValueError:
-                print "time data does not match allowed format."
+                print "Time data does not match allowed format."
 
         return d
 
@@ -894,7 +887,7 @@ class Core:
     @staticmethod
     def bugzilla_url(bz_bug):
         #TODO Implement finding dupllicate
-        if bz_bug is not None:
+        if bz_bug is not False:
             status = bz_bug.status
             if bz_bug.status == "CLOSED":
                 status += " {0}".format(bz_bug.resolution)
