@@ -72,7 +72,7 @@ class Core:
             step = getattr(self, "step" + str(i))
             print "Step {0} have {1} items".format(i, len(step))
 
-        self.send_data_to_mail()
+        #self.send_data_to_mail()
 
     def generate_output(self):
         if self.step1:
@@ -344,12 +344,9 @@ class Core:
                     self.output_message += self.bugzilla_url(bz_bug)
 
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
-        step_count_6 = 0
         if self.step6:
             self.output_message += "\nTraces occurring on RHEL-{0} that are probably fixed in Fedora\n".format("7")
             for key_hash, ureport in self.step6.items():
-                if step_count_6 >= 0:
-                    continue
 
                 slave_pf = [spf for spf in self.slave_dict[key_hash] if spf['probably_fixed'] is not None]
                 if not slave_pf:
@@ -398,8 +395,6 @@ class Core:
                     self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(pf['nvr'])
 
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
-
-                    step_count_6 += 1
 
         # Traces occurring on CentOS-${0} that are probably fixed in Fedora
         if self.step7:
@@ -552,6 +547,7 @@ class Core:
                     self.slave_dict[master_bt].append(tmp_ureport)
 
     def summarize_data(self):
+        '''
         # Bugzilla bugs with closed Fedora Bugzilla bugs
         # Step 1
         for bthash, value in self.slave_dict.items():
@@ -654,7 +650,7 @@ class Core:
 
                     self.step5[bthash] = ureport
                     self.already_processed.append(bthash)
-
+        '''
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         # Step 6
         for bthash, ureport in self.master.master_bt.items():
