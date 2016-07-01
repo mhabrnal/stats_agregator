@@ -1,3 +1,8 @@
+'''
+TODO:
+verze predelat pouze na ciselne
+'''
+
 import config
 import sys
 import pickle
@@ -72,7 +77,8 @@ class Core:
             step = getattr(self, "step" + str(i))
             print "Step {0} have {1} items".format(i, len(step))
 
-        #self.send_data_to_mail()
+        self.save_output_to_disk()
+        # self.send_data_to_mail()
 
     def generate_output(self):
         if self.step1:
@@ -538,16 +544,27 @@ class Core:
             if master_ureport['report']['component'] == "will-crash":
                 self.delete_bthash(master_bt)
                 continue
+
+            if self.get_mount_count(self.json_to_date(master_ureport['report']['first_occurrence']),
+                                    self.json_to_date(master_ureport['report']['last_occurrence'])) <= 1:
+                self.delete_bthash(master_bt)
+                continue
+
+            # We don't want sending reports
+            if master_ureport['avg_count_per_month'] <= 1:
+                self.delete_bthash(master_bt)
+                continue
+
             for server_name, slave_report in self.slave.slave_bt.items():
                 if master_bt in slave_report:
                     if master_bt not in self.slave_dict:
                         self.slave_dict[master_bt] = []
                     tmp_ureport = slave_report[master_bt]
                     tmp_ureport['source'] = config.SLAVE[server_name]
+
                     self.slave_dict[master_bt].append(tmp_ureport)
 
     def summarize_data(self):
-        '''
         # Bugzilla bugs with closed Fedora Bugzilla bugs
         # Step 1
         for bthash, value in self.slave_dict.items():
@@ -650,7 +667,7 @@ class Core:
 
                     self.step5[bthash] = ureport
                     self.already_processed.append(bthash)
-        '''
+
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         # Step 6
         for bthash, ureport in self.master.master_bt.items():
@@ -823,10 +840,6 @@ class Core:
             os.append(re.search('^[a-zA-Z ]*', r[0]).group(0).strip(" "))
         return os
 
-    # Find a way how to get name from oops log
-    def get_name_from_oops(oops):
-        pass
-
     @staticmethod
     def json_to_date(json_date):
         try:
@@ -882,7 +895,6 @@ class Core:
 
     @staticmethod
     def bugzilla_url(bz_bug):
-        #TODO Implement finding dupllicate
         if bz_bug is not False:
             status = bz_bug.status
             if bz_bug.status == "CLOSED":
@@ -892,3 +904,7 @@ class Core:
 
     def delete_bthash(self, bt_hash):
         del(self.master.master_bt[bt_hash])
+
+    def save_output_to_disk(self):
+        with open("output.txt", "w") as f:
+            f.write(self.output_message)
