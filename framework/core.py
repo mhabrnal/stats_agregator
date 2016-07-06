@@ -303,7 +303,7 @@ class Core:
 
                             self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(master_report['report']['id'])
 
-                            self.output_message += "\t- Fedora fixed in:                     {0}\n".format(bz_bug.fixed_in)
+                            self.output_message += "\t- Fedora fixed in:                     {0}\n".format(self.strip_name_from_version(bz_bug.fixed_in))
                             last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
 
                             self.output_message += self.bugzilla_url(bz_bug)
@@ -398,7 +398,7 @@ class Core:
                     self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
                         master_report['report']['id'])
 
-                    self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(pf['nvr'])
+                    self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(self.strip_name_from_version(pf['nvr']))
 
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
 
@@ -659,15 +659,16 @@ class Core:
                         continue
 
                     bugs = [b for b in s['bugs'] if
-                            b['type'] == "BUGZILLA" and ((b['status'] in ['CLOSED'] and
+                            b['type'] == "MANTIS" and ((b['status'] in ['CLOSED'] and
                                                           b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE'])
                                                          or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))] # TODO RLY BUGZILLA?
+
                     if not bugs:
                         continue
 
                     self.step5[bthash] = ureport
                     self.already_processed.append(bthash)
-
+        
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         # Step 6
         for bthash, ureport in self.master.master_bt.items():
@@ -817,7 +818,7 @@ class Core:
                 item[-1].sort(key=lambda x: parse_version(x[0]), reverse=True)
                 last_version = item[-1][0][0]
 
-        return last_version
+        return re.sub('^([0-9]:)?', '', last_version)
 
     @staticmethod
     def get_first_version(package_counts, component):
@@ -827,7 +828,7 @@ class Core:
                 item[-1].sort(key=lambda x: parse_version(x[0]))
                 first_version = item[-1][0][0]
 
-        return first_version
+        return re.sub('^([0-9]:)?', '', first_version)
 
     @staticmethod
     def get_bz_id(bug_url):
@@ -885,13 +886,11 @@ class Core:
             return 1
         return round(r_d)
 
-    @staticmethod
-    def get_rhel_latest_version(component):
+    def get_rhel_latest_version(self, component):
 
         bash_command = "brew latest-build rhel-7.3 {0} --quiet".format(component)
         process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-
-        return process.communicate()[0].split()[0]
+        return self.strip_name_from_version(process.communicate()[0].split()[0])
 
     @staticmethod
     def bugzilla_url(bz_bug):
@@ -908,3 +907,7 @@ class Core:
     def save_output_to_disk(self):
         with open("output.txt", "w") as f:
             f.write(self.output_message)
+
+    @staticmethod
+    def strip_name_from_version(version):
+        return str(re.sub('^([a-zA-Z0-9\-]*-)?([0-9]:)?', '', version))
