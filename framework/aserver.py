@@ -29,25 +29,6 @@ class AServer:
         with open("cache/" + file_name, "w") as f:
             f.write(json.dumps(data))
 
-    def fast_load(self, file_name):
-        '''
-        Working method for fast load json cache
-        '''
-        file_path = ""
-        if os.path.isfile(str(file_name)):
-            file_path = file_name
-        elif os.path.isfile("cache/" + str(file_name)):
-            file_path = "cache/" + str(file_name)
-        else:
-            raise "File doesn't exist"
-            return False
-
-        data = ""
-        with open(file_path, "r") as f:
-            for line in f:
-                data += line
-        return json.loads(data)
-
     @staticmethod
     def download_data(url, data):
         problem_url = url + "reports/items/"
