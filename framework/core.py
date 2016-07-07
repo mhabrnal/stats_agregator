@@ -26,6 +26,7 @@ class Core:
     slave = None
     bz = None
     bz_bugs = dict()
+    components = dict()
     slave_dict = dict()
 
     already_processed = []
@@ -63,7 +64,9 @@ class Core:
             self.slave.download_ureports(self.master.master_bt)
 
     def run(self):
-        self.load_bugs()  # TODO REWRITE TO BINARY CACHE
+        #self.load_bugs()  # TODO REWRITE TO BINARY CACHE
+        self.bz_bugs = load_binary_cache("bugzilla_bug.p")
+        self.components = load_binary_cache("components.p")
         self.download_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
@@ -71,7 +74,10 @@ class Core:
         self.summarize_data()
         self.sort_by_count()
         self.generate_output()
-        self.save_bugs()
+        #self.save_bugs()
+
+        save_binary_cache("bugzilla_bug.p", self.bz_bugs)
+        save_binary_cache("components.p", self.components)
 
         for i in range(1, 9):
             step = getattr(self, "step" + str(i))
@@ -359,6 +365,7 @@ class Core:
                     continue
 
                 master_report = self.master.master_bt[key_hash]
+
                 last_version = self.get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
@@ -377,6 +384,9 @@ class Core:
 
                 for spf in slave_pf:
                     pf = spf['probably_fixed']['probable_fix_build']
+
+                    if master_report['component'] != pf['base_package_name']:
+                        continue
 
                     self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], master_report['crash_function'])
 
@@ -524,6 +534,7 @@ class Core:
                             pass
                 self.output_message += "\n"
                 step_count_8 += 1
+
         print self.output_message
 
     def agregate_master_bthash(self):
@@ -668,7 +679,7 @@ class Core:
 
                     self.step5[bthash] = ureport
                     self.already_processed.append(bthash)
-        
+
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         # Step 6
         for bthash, ureport in self.master.master_bt.items():
@@ -887,10 +898,14 @@ class Core:
         return round(r_d)
 
     def get_rhel_latest_version(self, component):
-
-        bash_command = "brew latest-build rhel-7.3 {0} --quiet".format(component)
-        process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-        return self.strip_name_from_version(process.communicate()[0].split()[0])
+        if component in self.components:
+            return self.components[component]
+        else:
+            bash_command = "brew latest-build rhel-7.3 {0} --quiet".format(component)
+            process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
+            strip_version = self.strip_name_from_version(process.communicate()[0].split()[0])
+            self.components[component] = strip_version
+            return strip_version
 
     @staticmethod
     def bugzilla_url(bz_bug):
