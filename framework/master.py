@@ -1,11 +1,9 @@
-import config
-import urllib2
 import json
 import os.path
 import sys
-from datetime import datetime, timedelta
+import urllib2
+import config
 from aserver import AServer
-from pprint import pprint
 
 
 class Master(AServer):
@@ -40,6 +38,7 @@ class Master(AServer):
         if config.CACHE and not os.path.isfile("cache/" + self.master_file):
             self.save_cache(self.master_file, self.master_bt)
 
+    # TODO Use from AServer?
     def parse_hash_from_json(self, json_string):
         self.master_bt = (json.loads(json_string))
         if 'data' in self.master_bt:

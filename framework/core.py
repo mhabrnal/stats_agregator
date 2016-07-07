@@ -1,24 +1,10 @@
-'''
-TODO:
-verze predelat pouze na ciselne
-'''
-
-import config
-import sys
-import pickle
 import collections
-import json
-from pprint import pprint
-import bugzilla
-import re
 import subprocess
-import os
-from datetime import datetime, timedelta
+import bugzilla
+import config
 from framework.master import Master
 from framework.slave import Slave
 from framework.utils import *
-from pkg_resources import parse_version
-
 
 class Core:
 
@@ -59,14 +45,14 @@ class Core:
             if not self.slave.load_cache():
                 self.slave.download_ureports(self.master.master_bt)
         else:
-            self.clear_cache()
+            clear_cache()
             self.master.download_all_hash()
             self.slave.download_ureports(self.master.master_bt)
 
     def run(self):
-        #self.load_bugs()  # TODO REWRITE TO BINARY CACHE
         self.bz_bugs = load_binary_cache("bugzilla_bug.p")
         self.components = load_binary_cache("components.p")
+        
         self.download_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
@@ -74,7 +60,6 @@ class Core:
         self.summarize_data()
         self.sort_by_count()
         self.generate_output()
-        #self.save_bugs()
 
         save_binary_cache("bugzilla_bug.p", self.bz_bugs)
         save_binary_cache("components.p", self.components)
@@ -100,16 +85,16 @@ class Core:
 
                         bz_bug = self.get_bzbug(master_bug['id'])
 
-                        last_version = self.get_lastes_version(master_report['package_counts'], bz_bug.component)
-                        first_version = self.get_first_version(master_report['package_counts'], bz_bug.component)
+                        last_version = get_lastes_version(master_report['package_counts'], bz_bug.component)
+                        first_version = get_first_version(master_report['package_counts'], bz_bug.component)
 
-                        first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                        last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                        first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                        last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                        avg_month_counter = int(round(master_report['report']['count'] / self.get_mount_count(first_occurrence,
+                        avg_month_counter = int(round(master_report['report']['count'] / get_mount_count(first_occurrence,
                                                                                                      last_occurrence)))
 
-                        date_diff = self.date_diff(first_occurrence, last_occurrence)
+                        dd = date_diff(first_occurrence, last_occurrence)
 
                         if avg_month_counter <= 0:
                             continue
@@ -120,7 +105,7 @@ class Core:
                         self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(first_version, last_version)
                         self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(first_occurrence.strftime("%Y-%m-%d"),
                                                                                      last_occurrence.strftime("%Y-%m-%d"),
-                                                                                     date_diff)
+                                                                                     dd)
 
                         self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(master_report['report']['count'],
                                                                            int(round(avg_month_counter)))
@@ -130,7 +115,7 @@ class Core:
 
                         for b in bugs:
                             bz_bug = self.get_bzbug(b['id'])
-                            self.output_message += self.bugzilla_url(bz_bug)
+                            self.output_message += bugzilla_url(bz_bug)
 
                 for ureport in ureports:
                     for fedora_bug in ureport['bugs']:
@@ -148,11 +133,12 @@ class Core:
                             else:
                                 self.output_message += "\t- fixed in:                           -\n"
 
-                            self.output_message += self.bugzilla_url(f_bug)
+                            self.output_message += bugzilla_url(f_bug)
+            self.output_message += "\n"
 
         # generate output for step2
         if self.step2:
-            self.output_message += "\nProbably fixed Bugzilla bugs in RHEL-7\n"
+            self.output_message += "Probably fixed Bugzilla bugs in RHEL-7\n"
             for key_hash, ureport in self.step2.items():
                 bugs = []
                 for master_bug in ureport['bugs']:
@@ -162,15 +148,15 @@ class Core:
                         bz_bug = self.get_bzbug(master_bug['id'])
                         bugs.append(master_bug)
 
-                        last_version = self.get_lastes_version(master_report['package_counts'],
+                        last_version = get_lastes_version(master_report['package_counts'],
                                                                master_report['component'])
-                        first_version = self.get_first_version(master_report['package_counts'],
+                        first_version = get_first_version(master_report['package_counts'],
                                                                master_report['component'])
 
-                        first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                        last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                        first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                        last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                        date_diff = self.date_diff(first_occurrence, last_occurrence)
+                        dd = date_diff(first_occurrence, last_occurrence)
 
                         if master_report['avg_count_per_month'] <= 0:
                             continue
@@ -183,7 +169,7 @@ class Core:
                         self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                             first_occurrence.strftime("%Y-%m-%d"),
                             last_occurrence.strftime("%Y-%m-%d"),
-                            date_diff)
+                            dd)
 
                         self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                             master_report['report']['count'], master_report['avg_count_per_month'])
@@ -193,13 +179,13 @@ class Core:
 
                     self.output_message += "\t- latest RHEL version:                {0}\n".format(self.get_rhel_latest_version(ureport['component']))
 
-                    self.output_message += "\t- RHEL probably fixed in:             {0}:{1}-{2}\n".format(pfb['epoch'], pfb['version'],
+                    self.output_message += "\t- RHEL probably fixed in:             {0}-{1}\n".format(pfb['version'],
                                                                                          pfb['release'])
 
                 for b in bugs:
                     bz_bug = self.get_bzbug(b['id'])
 
-                    self.output_message += self.bugzilla_url(bz_bug)
+                    self.output_message += bugzilla_url(bz_bug)
 
                 self.output_message += "\n"
 
@@ -210,15 +196,15 @@ class Core:
 
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                date_diff = self.date_diff(first_occurrence, last_occurrence)
+                dd = date_diff(first_occurrence, last_occurrence)
 
                 if master_report['avg_count_per_month'] <= 0:
                     continue
@@ -226,11 +212,16 @@ class Core:
                 bugs = [b for b in master_report['bugs'] if b['type'] == 'BUGZILLA' and b['status'] in ['NEW', 'ASSIGNED']]
 
                 correct_bug = True
+                printed = []
                 for b in bugs:
                     bz_bug = self.get_bzbug(b['id'])
-                    if bz_bug.status not in ['NEW', 'ASSIGNED']:
+                    if bz_bug.id in printed:
+                        continue
+                    elif bz_bug.status not in ['NEW', 'ASSIGNED']:
                         correct_bug = False
                         continue
+                    else:
+                        printed.append(bz_bug.id)  # If bug is duplicated then we return parent -> can be 2 same bug
 
                     self.output_message += "*[{0}] - {1}\n".format(master_report['component'], bz_bug.summary)
 
@@ -241,19 +232,24 @@ class Core:
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
                         last_occurrence.strftime("%Y-%m-%d"),
-                        date_diff)
+                        dd)
 
                     self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                         master_report['report']['count'], master_report['avg_count_per_month'])
 
+                    printed = []
                     for b in bugs:
                         bz_bug = self.get_bzbug(b['id'])
-                        self.output_message += self.bugzilla_url(bz_bug)
+                        if bz_bug.id in printed:
+                            continue
+                        else:
+                            printed.append(bz_bug.id)
+                        self.output_message += bugzilla_url(bz_bug)
 
                     sr = [s for s in self.slave_dict[key_hash] if s['probably_fixed'] is not None]
                     for s in sr:
                         pfb = s['probably_fixed']['probable_fix_build']
-                        self.output_message += "\t- Fedora probably fixed in:                  {0}:{1}-{2}\n".format(pfb['epoch'], pfb['version'],
+                        self.output_message += "\t- Fedora probably fixed in:                  {0}-{1}\n".format(pfb['version'],
                                                                                                                  pfb['release'])
 
                         self.output_message += "\t- {0}reports/{1}\n".format(s['source'], s['report']['id'])
@@ -276,16 +272,16 @@ class Core:
 
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                date_diff = self.date_diff(first_occurrence, last_occurrence)
+                dd = date_diff(first_occurrence, last_occurrence)
 
                 if master_report['avg_count_per_month'] <= 0:
                     continue
@@ -294,7 +290,7 @@ class Core:
                     for sb in s['bugs']:
                         bz_bug = self.get_bzbug(sb['id'])
                         if bz_bug and bz_bug.status == 'CLOSED' and bz_bug.resolution in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']:
-                            self.output_message += "* [{0}] - {1} - {2}\n".format(master_report['report']['component'], bz_bug.summary, key_hash)
+                            self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
 
                             self.output_message += "\t- first / last affected RHEL version: {0} / {1}\n".format(
                                 first_version, last_version)
@@ -302,17 +298,17 @@ class Core:
                             self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                                 first_occurrence.strftime("%Y-%m-%d"),
                                 last_occurrence.strftime("%Y-%m-%d"),
-                                date_diff)
+                                dd)
 
                             self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                                 master_report['report']['count'], master_report['avg_count_per_month'])
 
                             self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(master_report['report']['id'])
 
-                            self.output_message += "\t- Fedora fixed in:                     {0}\n".format(self.strip_name_from_version(bz_bug.fixed_in))
-                            last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
+                            self.output_message += "\t- Fedora fixed in:                     {0}\n".format(strip_name_from_version(bz_bug.fixed_in))
+                            last_version = get_lastes_version(ureport['package_counts'], master_report['component'])
 
-                            self.output_message += self.bugzilla_url(bz_bug)
+                            self.output_message += bugzilla_url(bz_bug)
                             self.output_message += "\n"
 
         # Traces occurring on CentOS${X} that are fixed in Fedora:
@@ -325,17 +321,17 @@ class Core:
                     continue
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
                 try:
-                    avg_month_counter = int(round(master_report['report']['count'] / self.get_mount_count(first_occurrence,
+                    avg_month_counter = int(round(master_report['report']['count'] / get_mount_count(first_occurrence,
                                                                                                           last_occurrence)))
                 except:
                     continue
@@ -351,9 +347,9 @@ class Core:
                         first_version, last_version)
 
                     self.output_message += "\t - fixed in: {0}\n".format(bz_bug.fixed_in)
-                    last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
+                    last_version = get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t - last affected version: {0}\n".format(last_version)
-                    self.output_message += self.bugzilla_url(bz_bug)
+                    self.output_message += bugzilla_url(bz_bug)
 
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         if self.step6:
@@ -366,18 +362,18 @@ class Core:
 
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                date_diff = self.date_diff(first_occurrence, last_occurrence)
+                dd = date_diff(first_occurrence, last_occurrence)
 
-                avg_month_counter = int(round(master_report['report']['count'] / self.get_mount_count(first_occurrence,
+                avg_month_counter = int(round(master_report['report']['count'] / get_mount_count(first_occurrence,
                                                                                                       last_occurrence)))
                 if avg_month_counter <= 0:
                     continue
@@ -396,7 +392,7 @@ class Core:
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
                         last_occurrence.strftime("%Y-%m-%d"),
-                        date_diff)
+                        dd)
 
                     self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                         master_report['report']['count'],
@@ -408,7 +404,7 @@ class Core:
                     self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
                         master_report['report']['id'])
 
-                    self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(self.strip_name_from_version(pf['nvr']))
+                    self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(strip_name_from_version(pf['nvr']))
 
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
 
@@ -423,16 +419,16 @@ class Core:
 
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                date_diff = self.date_diff(first_occurrence, last_occurrence)
+                dd = date_diff(first_occurrence, last_occurrence)
 
                 if master_report['avg_count_per_month'] <= 0:
                     continue
@@ -446,7 +442,7 @@ class Core:
                     self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                         first_occurrence.strftime("%Y-%m-%d"),
                         last_occurrence.strftime("%Y-%m-%d"),
-                        date_diff)
+                        dd)
 
                     self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                         master_report['report']['count'], master_report['avg_count_per_month'])
@@ -459,9 +455,9 @@ class Core:
 
                     pf = spf['probably_fixed']['probable_fix_build']
 
-                    self.output_message += "\t- probably fixed in: {0}:{1}-{2}\n".format(pf['epoch'], pf['version'],
-                                                                                          pf['release'])
-                    last_version = self.get_lastes_version(ureport['package_counts'], master_report['component'])
+                    self.output_message += "\t- probably fixed in: {0}-{1}\n".format(pf['version'], pf['release'])
+
+                    last_version = get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t- last affected version: {0}\n".format(last_version)
                     self.output_message += "\t- {0}reports/{1}\n\n".format(self.master.url, ureport['report']['id'])# NA BZ
 
@@ -477,16 +473,16 @@ class Core:
 
                 master_report = self.master.master_bt[key_hash]
 
-                last_version = self.get_lastes_version(master_report['package_counts'],
+                last_version = get_lastes_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_version = self.get_first_version(master_report['package_counts'],
+                first_version = get_first_version(master_report['package_counts'],
                                                        master_report['component'])
 
-                first_occurrence = self.json_to_date(master_report['report']['first_occurrence'])
-                last_occurrence = self.json_to_date(master_report['report']['last_occurrence'])
+                first_occurrence = json_to_date(master_report['report']['first_occurrence'])
+                last_occurrence = json_to_date(master_report['report']['last_occurrence'])
 
-                date_diff = self.date_diff(first_occurrence, last_occurrence)
+                dd = date_diff(first_occurrence, last_occurrence)
 
                 if master_report['avg_count_per_month'] <= 0:
                     continue
@@ -499,7 +495,7 @@ class Core:
                 self.output_message += "\t- first / last RHEL occurrence:       {0} / {1} ({2})\n".format(
                     first_occurrence.strftime("%Y-%m-%d"),
                     last_occurrence.strftime("%Y-%m-%d"),
-                    date_diff)
+                    dd)
 
                 self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                     master_report['report']['count'], master_report['avg_count_per_month'])
@@ -508,13 +504,13 @@ class Core:
                     master_report['report']['id'])
 
                 for spf in slave_pf:
-                    last_slave_version = self.get_lastes_version(spf['package_counts'], master_report['component'])
-                    first_slave_version = self.get_first_version(spf['package_counts'], master_report['component'])
+                    last_slave_version = get_lastes_version(spf['package_counts'], master_report['component'])
+                    first_slave_version = get_first_version(spf['package_counts'], master_report['component'])
 
-                    first_slave_occurrence = self.json_to_date(spf['report']['first_occurrence'])
-                    last_slave_occurrence = self.json_to_date(spf['report']['last_occurrence'])
+                    first_slave_occurrence = json_to_date(spf['report']['first_occurrence'])
+                    last_slave_occurrence = json_to_date(spf['report']['last_occurrence'])
 
-                    slave_date_diff = self.date_diff(first_slave_occurrence, last_slave_occurrence)
+                    slave_date_diff = date_diff(first_slave_occurrence, last_slave_occurrence)
 
                     self.output_message += "\t- first/last affected Fedora version: {0}/{1}\n".format(first_slave_version, last_slave_version)
 
@@ -527,7 +523,7 @@ class Core:
                             bz_bug = self.get_bzbug(bug['id'])
                             if not bz_bug:
                                 continue
-                            self.output_message += self.bugzilla_url(bz_bug)
+                            self.output_message += bugzilla_url(bz_bug)
 
                         elif bug['type'] == "MANTIS":
                             # TODO implement mantis api
@@ -556,8 +552,8 @@ class Core:
                 self.delete_bthash(master_bt)
                 continue
 
-            if self.get_mount_count(self.json_to_date(master_ureport['report']['first_occurrence']),
-                                    self.json_to_date(master_ureport['report']['last_occurrence'])) <= 1:
+            if get_mount_count(json_to_date(master_ureport['report']['first_occurrence']),
+                               json_to_date(master_ureport['report']['last_occurrence'])) <= 1:
                 self.delete_bthash(master_bt)
                 continue
 
@@ -607,11 +603,11 @@ class Core:
             if bthash not in self.already_processed and report['probably_fixed'] is not None and 'bugs' in report:
                 for bug in report['bugs']:
                     if bug['type'] == 'BUGZILLA' and (bug['status'] != 'CLOSED' and bug['status'] in ['NEW', 'ASSIGNED']):
-                        first_occurrence = self.json_to_date(report['report']['first_occurrence'])
-                        last_occurrence = self.json_to_date(report['report']['last_occurrence'])
-                        # TODO Is this rly need??
+                        first_occurrence = json_to_date(report['report']['first_occurrence'])
+                        last_occurrence = json_to_date(report['report']['last_occurrence'])
+
                         avg_month_counter = int(
-                            round(report['report']['count'] / self.get_mount_count(first_occurrence, last_occurrence)))
+                            round(report['report']['count'] / get_mount_count(first_occurrence, last_occurrence)))
 
                         report['report']['avg_count'] = avg_month_counter
 
@@ -643,7 +639,7 @@ class Core:
             if bthash in self.already_processed:
                 continue
 
-            occurring_os = self.get_opsys(ureport['releases'])
+            occurring_os = get_opsys(ureport['releases'])
 
             if len(ureport['report']['bugs']) == 0 and "Red Hat Enterprise Linux" in occurring_os:
                 for s in self.slave_dict[bthash]:
@@ -663,16 +659,16 @@ class Core:
             if bthash in self.already_processed:
                 continue
 
-            occurring_os = self.get_opsys(ureport['releases'])
+            occurring_os = get_opsys(ureport['releases'])
             if len(ureport['report']['bugs']) == 0 and "CentOS" in occurring_os:
                 for s in self.slave_dict[bthash]:
                     if 'bugs' not in s:
                         continue
 
                     bugs = [b for b in s['bugs'] if
-                            b['type'] == "MANTIS" and ((b['status'] in ['CLOSED'] and
-                                                          b['resolution'] in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE'])
-                                                         or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))] # TODO RLY BUGZILLA?
+                            b['type'] == "MANTIS" and ((b['status'] in ['CLOSED'] and b['resolution'] in
+                                                        ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE'])
+                                                       or (b['status'] in ['VERIFIED', 'RELEASE_PENDING']))]
 
                     if not bugs:
                         continue
@@ -686,7 +682,7 @@ class Core:
             if bthash in self.already_processed:
                 continue
 
-            occurring_os = self.get_opsys(ureport['releases'])
+            occurring_os = get_opsys(ureport['releases'])
 
             if len(ureport['report']['bugs']) == 0 and "Red Hat Enterprise Linux" in occurring_os and ureport['report']['count'] > 400:
                 for s in self.slave_dict[bthash]:
@@ -702,7 +698,7 @@ class Core:
             if bthash in self.already_processed:
                 continue
 
-            occurring_os = self.get_opsys(ureport['releases'])
+            occurring_os = get_opsys(ureport['releases'])
 
             if len(ureport['report']['bugs']) == 0 and "CentOS" in occurring_os:
                 for s in self.slave_dict[bthash]:
@@ -790,19 +786,6 @@ class Core:
             bug = self.get_bzbug(bug.dupe_of)
         return bug
 
-    def load_bugs(self):
-        if os.path.isfile("cache/bugzilla_bug"):
-            with open("cache/bugzilla_bug", "rb") as f:
-                try:
-                    self.bz_bugs = pickle.load(f)
-                except pickle.UnpicklingError as e:
-                    print "{0}".format(e.message)
-                    exit()
-
-    def save_bugs(self):
-        with open("cache/bugzilla_bug", "wb") as f:
-            f.write(pickle.dumps(self.bz_bugs))
-
     def sort_by_count(self):
         for i in range(1, 9):
             if len(getattr(self, "step" + str(i))) > 0:
@@ -811,110 +794,15 @@ class Core:
                     sorted(step.items(), key=lambda item: int(item[1]['avg_count_per_month']), reverse=True))
                 setattr(self, "step" + str(i), step)
 
-    @staticmethod
-    def clear_cache():
-        """
-        Delete all cached file
-        """
-        files = os.listdir("cache")
-        for f in files:
-            os.unlink("cache/" + f)
-            print "Delete cache cache/" + f
-
-    @staticmethod
-    def get_lastes_version(package_counts, component):
-        last_version = ""
-        for item in package_counts:
-            if re.search("^" + component, item[0]):
-                item[-1].sort(key=lambda x: parse_version(x[0]), reverse=True)
-                last_version = item[-1][0][0]
-
-        return re.sub('^([0-9]:)?', '', last_version)
-
-    @staticmethod
-    def get_first_version(package_counts, component):
-        first_version = ""
-        for item in package_counts:
-            if re.search("^" + component, item[0]):
-                item[-1].sort(key=lambda x: parse_version(x[0]))
-                first_version = item[-1][0][0]
-
-        return re.sub('^([0-9]:)?', '', first_version)
-
-    @staticmethod
-    def get_bz_id(bug_url):
-        return re.search('[0-9]*$', bug_url).group(0)
-
-    @staticmethod
-    def get_opsys(releases):
-        os = []
-        for r in releases:
-            os.append(re.search('^[a-zA-Z ]*', r[0]).group(0).strip(" "))
-        return os
-
-    @staticmethod
-    def json_to_date(json_date):
-        try:
-            d = datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S.%f')
-        except:
-            try:
-                d = datetime.strptime(json_date, '%Y-%m-%dT%H:%M:%S')
-            except ValueError:
-                print "Time data does not match allowed format."
-
-        return d
-
-
-    @staticmethod
-    def date_diff(first, last):
-        diff = last - first
-
-        year = diff.days / 365
-        months = round((diff.days / 30.4) - (year * 12))
-
-        spell_m = "month"
-        if months > 1:
-            spell_m = "months"
-
-        spell_y = "year"
-        if year > 1:
-            spell_y = "years"
-
-        if year > 0 and months > 0:
-            return "~ {0} {1} {2} {3}".format(year, spell_y, str(int(months)), spell_m)
-        elif year > 0:
-            return "~ {0} {1}".format(year, spell_y)
-        elif months > 0:
-            return "~ {0} {1}".format(str(int(months)), spell_m)
-        else:
-            return "~1 month"
-
-    @staticmethod
-    def get_mount_count(first, last):
-        diff = last - first
-        r_d = diff.days / 30.4
-        if r_d < 1:
-            return 1
-        return round(r_d)
-
     def get_rhel_latest_version(self, component):
         if component in self.components:
             return self.components[component]
         else:
             bash_command = "brew latest-build rhel-7.3 {0} --quiet".format(component)
             process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-            strip_version = self.strip_name_from_version(process.communicate()[0].split()[0])
+            strip_version = strip_name_from_version(process.communicate()[0].split()[0])
             self.components[component] = strip_version
             return strip_version
-
-    @staticmethod
-    def bugzilla_url(bz_bug):
-        if bz_bug is not False:
-            status = bz_bug.status
-            if bz_bug.status == "CLOSED":
-                status += " {0}".format(bz_bug.resolution)
-
-            return "\t- https://bugzilla.redhat.com/{0} - {1}\n".format(bz_bug.id, status)
 
     def delete_bthash(self, bt_hash):
         del(self.master.master_bt[bt_hash])
@@ -922,7 +810,3 @@ class Core:
     def save_output_to_disk(self):
         with open("output.txt", "w") as f:
             f.write(self.output_message)
-
-    @staticmethod
-    def strip_name_from_version(version):
-        return str(re.sub('^([a-zA-Z0-9\-]*-)?([0-9]:)?', '', version))

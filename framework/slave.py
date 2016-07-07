@@ -1,12 +1,10 @@
-import config
-import urllib2
-import urllib
 import json
 import os.path
-from pprint import pprint
 import sys
+import urllib2
+import config
 from aserver import AServer
-
+from datetime import datetime
 
 class Slave(AServer):
 
@@ -74,7 +72,14 @@ class Slave(AServer):
 
     @staticmethod
     def parse_hash_from_json(json_string):
-        js = json.loads(json_string)
+        try:
+            js = json.loads(json_string)
+        except ValueError:
+            str_name = "log/json_error_{0}.log".format(datetime.now())
+            with open(str_name, "w") as f:
+                f.write(json_string)
+                print "JSON Can't be parsed. String was saved to {0}".format(str_name)
+                exit()
         return js
 
     def load_cache(self):
@@ -89,10 +94,8 @@ class Slave(AServer):
 
     def get_problem_by_bthash(self, problem_bt_hash):
         for s_name, s_url in self.url.items():
-            # problem_url = s_url + "/problems/bthash/?" + problem_bt_hash + "&bth=f3f5e5020c0f69f71c66fe33e47d232435c451a0"
             problem_url = s_url + "problems/bthash/?" + problem_bt_hash
 
-            #print problem_url + "\n"
             p_request = urllib2.Request(problem_url, headers={"Accept": "application/json"})
 
             try:
