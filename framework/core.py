@@ -191,7 +191,7 @@ class Core:
 
         # generate output for step3
         if self.step3:
-            self.output_message += "\nRHEL-{0} Bugzilla bugs probably fixed in Fedora\n".format(7)
+            self.output_message += "RHEL-{0} Bugzilla bugs probably fixed in Fedora\n".format(7)
             for key_hash, value in self.step3.items():  # step 3 contain slave's reports
 
                 master_report = self.master.master_bt[key_hash]
@@ -258,7 +258,7 @@ class Core:
 
         # Resolved Fedora Bugzilla bugs appearing in RHEL-X
         if self.step4:
-            self.output_message += "\nResolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
+            self.output_message += "Resolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
             for key_hash, ureport in self.step4.items():
                 slave = []
                 for sl in self.slave_dict[key_hash]:
@@ -286,9 +286,15 @@ class Core:
                 if master_report['avg_count_per_month'] <= 0:
                     continue
 
+                printed = []
                 for s in slave:
                     for sb in s['bugs']:
                         bz_bug = self.get_bzbug(sb['id'])
+                        if bz_bug.id in printed:
+                            continue
+                        else:
+                            printed.append(bz_bug.id)
+
                         if bz_bug and bz_bug.status == 'CLOSED' and bz_bug.resolution in ['ERRATA', 'NEXTRELEASE', 'CURRENTRELEASE', 'RAWHIDE']:
                             self.output_message += "* [{0}] - {1}\n".format(master_report['report']['component'], bz_bug.summary)
 
