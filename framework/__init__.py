@@ -1,5 +1,5 @@
-import core
+import categories
 import master
 import slave
 
-__all__ = ["core", "master", "slave", "utils"]
+__all__ = ["categories.py", "master", "slave", "utils"]
