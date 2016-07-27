@@ -30,6 +30,18 @@ class ACore:
 
         self.bz.login(config.BZ_USER, config.BZ_PASSWORD)
 
+    @abstractmethod
+    def run(self):
+        pass
+
+    @abstractmethod
+    def generate_output(self):
+        pass
+
+    @abstractmethod
+    def sort_by_count(self):
+        pass
+
     def download_data(self):
         if config.CACHE and self.old_cache():
 
@@ -42,14 +54,6 @@ class ACore:
             clear_cache()
             self.master.download_all_hash()
             self.slave.download_ureports(self.master.master_bt)
-
-    @abstractmethod
-    def run(self):
-        pass
-
-    @abstractmethod
-    def generate_output(self):
-        pass
 
     def send_data_to_mail(self):
         import smtplib
@@ -113,10 +117,6 @@ class ACore:
         if bug.resolution in ["DUPLICATE"]:
             bug = self.get_bzbug(bug.dupe_of)
         return bug
-
-    @abstractmethod
-    def sort_by_count(self):
-        pass
 
     def get_rhel_latest_version(self, component):
         if component in self.components:

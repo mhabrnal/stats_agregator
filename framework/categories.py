@@ -6,14 +6,6 @@ from framework.utils import *
 
 class Categories(ACore):
 
-    master = None
-    slave = None
-    bz = None
-    bz_bugs = dict()
-    components = dict()
-    slave_dict = dict()
-
-    already_processed = []
     # Data for separate steps
     step1 = dict()  # Bugzilla bugs with closed Fedora Bugzilla bugs
     step2 = dict()  # Bugzilla bugs probably fixed in RHEL
@@ -23,8 +15,6 @@ class Categories(ACore):
     step6 = dict()  # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
     step7 = dict()  # Traces occurring on CentOS-${X} that are probably fixed in Fedora:
     step8 = dict()  # Fedora Bugzilla bugs and CentOS bugs appearing in RHEL-7
-
-    output_message = ""
 
     def __init__(self):
         super(Categories, self).__init__()
@@ -44,10 +34,6 @@ class Categories(ACore):
         save_binary_cache("bugzilla_bug.p", self.bz_bugs)
         save_binary_cache("components.p", self.components)
 
-        for i in range(1, 9):
-            step = getattr(self, "step" + str(i))
-            print "Step {0} have {1} items".format(i, len(step))
-
         self.save_output_to_disk()
 
         # self.send_data_to_mail()
@@ -63,6 +49,14 @@ class Categories(ACore):
         self.output_step_8(self.step8)
 
         print self.output_message
+
+    def sort_by_count(self):
+        for i in range(1, 9):
+            if len(getattr(self, "step" + str(i))) > 0:
+                step = getattr(self, "step" + str(i))
+                step = collections.OrderedDict(
+                    sorted(step.items(), key=lambda item: int(item[1]['avg_count_per_month']), reverse=True))
+                setattr(self, "step" + str(i), step)
 
     def summarize_data(self):
         # Bugzilla bugs with closed Fedora Bugzilla bugs
@@ -234,11 +228,3 @@ class Categories(ACore):
                         continue
 
                     self.step8[bthash] = ureport
-
-    def sort_by_count(self):
-        for i in range(1, 9):
-            if len(getattr(self, "step" + str(i))) > 0:
-                step = getattr(self, "step" + str(i))
-                step = collections.OrderedDict(
-                    sorted(step.items(), key=lambda item: int(item[1]['avg_count_per_month']), reverse=True))
-                setattr(self, "step" + str(i), step)

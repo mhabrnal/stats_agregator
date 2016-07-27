@@ -6,15 +6,8 @@ from framework.utils import *
 
 class Team(ACore):
 
-    master = None
-    slave = None
-    bz = None
-    bz_bugs = dict()
     teams = dict()
     team_data = dict()
-    components = dict()
-
-    output_message = ""
 
     def __init__(self):
         super(Team, self).__init__()
@@ -57,6 +50,16 @@ class Team(ACore):
             self.output_step_8(team_steps['step8'])
 
             print self.output_message
+
+    def sort_by_count(self):
+        for team_steps in self.team_data.values():
+            for i in range(1, 9):
+                if len(team_steps['step{0}'.format(i)]) > 0:
+                    step = collections.OrderedDict(
+                        sorted(team_steps['step{0}'.format(i)].items(),
+                               key=lambda item: int(item[1]['avg_count_per_month']), reverse=True))
+
+                    team_steps['step{0}'.format(i)] = step
 
     def summarize_data(self):
         # Bugzilla bugs with closed Fedora Bugzilla bugs
@@ -265,12 +268,3 @@ class Team(ACore):
                 self.team_data[team]['step{0}'.format(x)] = dict()
 
         return team
-
-    def sort_by_count(self):
-        for team_steps in self.team_data.values():
-            for i in range(1, 9):
-                if len(team_steps['step{0}'.format(i)]) > 0:
-                    step = collections.OrderedDict(
-                        sorted(team_steps['step{0}'.format(i)].items(), key=lambda item: int(item[1]['avg_count_per_month']), reverse=True))
-
-                    team_steps['step{0}'.format(i)] = step
