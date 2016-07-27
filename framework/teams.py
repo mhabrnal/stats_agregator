@@ -58,19 +58,6 @@ class Team(ACore):
 
             print self.output_message
 
-    def agregate_master_bthash(self):
-        """
-        Aggregate all unique bt_hash from slave servers and assign to
-        master variable for downloading ureports from master
-        """
-        correct_bthashes = []
-        for hashes in self.slave.slave_bt.values():
-            for slave_bthash in hashes.keys():
-                if slave_bthash not in correct_bthashes:
-                    correct_bthashes.append(slave_bthash)
-
-        self.master.master_bt = correct_bthashes
-
     def summarize_data(self):
         # Bugzilla bugs with closed Fedora Bugzilla bugs
         # Step 1
