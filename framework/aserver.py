@@ -1,10 +1,8 @@
 # Abstract Class for served master and slave server
-from abc import ABCMeta, abstractmethod
 import json
-import urllib2
-import os
 import sys
-import pickle
+import urllib2
+from abc import ABCMeta, abstractmethod
 
 
 class AServer:
@@ -23,12 +21,14 @@ class AServer:
     def load_cache(self):  # TODO RE IMPLEMENT FROM CHILD CLASSES
         pass
 
+    #TODO probably move to utils
     def save_cache(self, file_name, data):
         print "Save cache to file '{0}'".format(file_name)
 
         with open("cache/" + file_name, "w") as f:
             f.write(json.dumps(data))
 
+    # TODO probably move to utils
     @staticmethod
     def download_data(url, data):
         problem_url = url + "reports/items/"

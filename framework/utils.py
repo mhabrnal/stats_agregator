@@ -5,8 +5,8 @@ from datetime import datetime
 from pkg_resources import parse_version
 
 
-def save_binary_cache(file_name, variable):
-    if not os.path.isfile("cache/" + file_name):
+def save_binary_cache(file_name, variable, force_write=True):
+    if not os.path.isfile("cache/" + file_name) or force_write:
         with open("cache/" + file_name, "wb") as f:
             f.write(pickle.dumps(variable))
 
