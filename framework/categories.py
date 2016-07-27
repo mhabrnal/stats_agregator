@@ -6,6 +6,7 @@ from framework.master import Master
 from framework.slave import Slave
 from framework.utils import *
 
+
 class Categories:
 
     master = None
@@ -641,9 +642,14 @@ class Categories:
                 if not pf:
                     continue
 
-                bugs = [b for b in ureport['bugs'] if b['type'] == 'BUGZILLA' and b['status'] in ('NEW', 'ASSIGNED')]
+                bugs = [b for b in ureport['bugs'] if b['type'] == 'BUGZILLA']
+                actual_bugs = []
+                for b in bugs:
+                    bz_b = self.get_bzbug(b['id'])
+                    if bz_b.status in ('NEW', 'ASSIGNED'):
+                        actual_bugs.append(b)
 
-                if not bugs:
+                if not actual_bugs:
                     continue
 
                 self.step3[bthash] = ureport
