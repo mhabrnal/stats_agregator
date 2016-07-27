@@ -1,6 +1,11 @@
 import os
 import pickle
 import re
+import json
+import urllib
+import urllib2
+import config
+
 from datetime import datetime
 from pkg_resources import parse_version
 
@@ -116,3 +121,17 @@ def get_mount_count(first, last):
     if r_d < 1:
         return 1
     return round(r_d)
+
+
+def watson_api(component_name, assignee):
+    data = urllib.urlencode({
+        "assignee": assignee,
+        "component": component_name,
+    })
+
+    while True:
+        try:
+            return json.load(urllib2.urlopen(config.WATSON_URL, data))
+        except urllib2.HTTPError, e:
+            print "Retrying...", e
+            pass
