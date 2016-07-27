@@ -1,9 +1,5 @@
 import collections
-import json
-import urllib
-import urllib2
 
-import config
 from framework.acore import ACore
 from framework.utils import *
 
@@ -266,9 +262,9 @@ class Team(ACore):
         team_key = str('{0}:{1}'.format(component_name, user))
 
         if team_key not in self.teams:
-            team = self.watson_api(component_name, user)
+            team = watson_api(component_name, user)
             team = team['subsystem']
-            if team == 'UNKNOWN':
+            if team == 'UNKNOWN':  # This team probably doesn't belongs to RHEL
                 print component_name
 
             self.teams[team_key] = team
@@ -282,19 +278,6 @@ class Team(ACore):
                 self.team_data[team]['step{0}'.format(x)] = dict()
 
         return team
-
-    def watson_api(self, component_name, assignee):
-        data = urllib.urlencode({
-            "assignee": assignee,
-            "component": component_name,
-        })
-
-        while True:
-            try:
-                return json.load(urllib2.urlopen(config.WATSON_URL, data))
-            except urllib2.HTTPError, e:
-                print "Retrying...", e
-                pass
 
     def sort_by_count(self):
         for team_steps in self.team_data.values():
