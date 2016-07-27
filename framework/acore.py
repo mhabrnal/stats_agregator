@@ -1,9 +1,7 @@
 import subprocess
+import bugzilla
 from abc import ABCMeta, abstractmethod
 
-import bugzilla
-
-import config
 from framework.master import Master
 from framework.slave import Slave
 from framework.utils import *
@@ -66,6 +64,19 @@ class ACore:
         s = smtplib.SMTP('localhost')
         s.sendmail('phelia@redhat.com', 'phelia@redhat.com', msg.as_string())
         s.quit()
+
+    def agregate_master_bthash(self):
+        """
+        Aggregate all unique bt_hash from slave servers and assign to
+        master variable for downloading ureports from master
+        """
+        correct_bthashes = []
+        for hashes in self.slave.slave_bt.values():
+            for slave_bthash in hashes.keys():
+                if slave_bthash not in correct_bthashes:
+                    correct_bthashes.append(slave_bthash)
+
+        self.master.master_bt = correct_bthashes
 
     def old_cache(self, days=30, hours=0, minutes=0):
         """
