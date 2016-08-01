@@ -5,6 +5,8 @@ import urllib2
 import config
 from aserver import AServer
 from datetime import datetime
+from utils import download_data, save_cache
+from pprint import pprint
 
 class Slave(AServer):
 
@@ -14,7 +16,6 @@ class Slave(AServer):
     def download_ureports(self, master_bt):
         for server_name, server_url in self.url.items():
             # Download from all source
-
             result = self.get_ureport_by_hash(master_hash=master_bt,
                                               source=server_url)
 
@@ -23,18 +24,19 @@ class Slave(AServer):
             self.slave_bt[server_name] = parse_json
 
             if config.CACHE:
-                self.save_cache(server_name + ".json", parse_json)
+                save_cache(server_name + ".json", parse_json)
 
     def load(self, master_hash):
         if config.CACHE:
             # Load from cache and download only missing source
+            for server_name, server_url in self.url.items():
+                self.slave_bt[server_name] = self.load_cache(server_name + ".json", "r")
             self.load_cache(master_hash)
         else:
             for server_name, server_url in self.url.items():
                 # Download from all source
 
                 result = self.get_ureport_by_hash(master_hash=master_hash, source=server_url)
-
                 parse_json = self.parse_hash_from_json(result)
 
                 self.slave_bt[server_name] = parse_json
@@ -44,8 +46,7 @@ class Slave(AServer):
 
         if isinstance(self.url, dict):
             if source is not None:
-                json_result = self.download_data(url=source,
-                                                 data=master_hash)
+                json_result = download_data(url=source, data=master_hash)
         return json_result
 
     @staticmethod
@@ -70,23 +71,13 @@ class Slave(AServer):
         json_string = data.read()
         return json_string
 
-    @staticmethod
-    def parse_hash_from_json(json_string):
-        try:
-            js = json.loads(json_string)
-        except ValueError:
-            str_name = "log/json_error_{0}.log".format(datetime.now())
-            with open(str_name, "w") as f:
-                f.write(json_string)
-                print "JSON Can't be parsed. String was saved to {0}".format(str_name)
-                exit()
-        return js
-
+    '''
     def load_cache(self):
         for server_name, server_url in self.url.items():
             if os.path.isfile("cache/" + server_name + ".json"):
                 with open("cache/" + server_name + ".json", "r") as f:
                     for line in f:
+                        print "SLAVE PARSE"
                         self.slave_bt[server_name] = self.parse_hash_from_json(line)
                 return True
             else:
@@ -101,7 +92,7 @@ class Slave(AServer):
             try:
                 problem_request = urllib2.urlopen(p_request)
             except urllib2.HTTPError as e:
-                print "While tring download '" + problem_url + "' we get code: " + str(e.code)
+                print "While trying download '" + problem_url + "' we get code: " + str(e.code)
                 continue
             else:
                 problem_string = problem_request.read()
@@ -120,3 +111,4 @@ class Slave(AServer):
     def download_problems(self, master_problem):
         for p in master_problem:
             self.get_problem_by_bthash(p['bt_hash_qs'])
+    '''

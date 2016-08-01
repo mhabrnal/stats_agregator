@@ -16,8 +16,7 @@ class Team(ACore):
         self.bz_bugs = load_binary_cache("bugzilla_bug.p")
         self.components = load_binary_cache("components.p")
         self.teams = load_binary_cache("teams.p")
-        
-        self.download_data()
+        self.download_server_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
         self.group_data_by_bt_hash()
@@ -31,14 +30,18 @@ class Team(ACore):
 
         self.save_output_to_disk()
 
-        # self.send_data_to_mail()
+        #self.send_data_to_mail()
 
     def generate_output(self):
         for team_name, team_steps in self.team_data.items():
             if team_name == "UNKNOWN":
                 continue
 
-            self.output_message += "{0}\n\n".format(team_name)
+            self.output_message += "{0}\n".format(team_name)
+            strip = ""
+            for i in range(0, len(team_name)):
+                strip += "="
+            self.output_message += "{0}\n\n".format(strip)
 
             self.output_step_1(team_steps['step1'])
             self.output_step_2(team_steps['step2'])
@@ -48,8 +51,9 @@ class Team(ACore):
             self.output_step_6(team_steps['step6'])
             self.output_step_7(team_steps['step7'])
             self.output_step_8(team_steps['step8'])
+            self.output_message += "\n\n"
 
-            print self.output_message
+        print self.output_message
 
     def sort_by_count(self):
         for team_steps in self.team_data.values():
@@ -117,7 +121,11 @@ class Team(ACore):
                 continue
 
             if 'bugs' in report:
-                pf = [r['probably_fixed'] for r in self.slave_dict[bthash] if r['probably_fixed'] is not None]
+                try:
+                    pf = [r['probably_fixed'] for r in self.slave_dict[bthash] if r['probably_fixed'] is not None]
+                except:
+                    pprint(self.slave_dict)
+                    exit()
                 if not pf:
                     continue
 
@@ -246,6 +254,7 @@ class Team(ACore):
                     if not valid:
                         continue
 
+                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
                     self.team_data[team_name]['step8'][bthash] = report
 
     def create_team(self, component_name, user):
@@ -256,6 +265,9 @@ class Team(ACore):
             team = team['subsystem']
             if team == 'UNKNOWN':  # This team probably doesn't belongs to RHEL
                 print component_name
+
+            if team == 'Platform Hardware Enablement - RHEL':
+                print component_name, user
 
             self.teams[team_key] = team
         else:

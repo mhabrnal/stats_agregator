@@ -42,14 +42,22 @@ class ACore:
     def sort_by_count(self):
         pass
 
-    def download_data(self):
+    def download_server_data(self):
         if config.CACHE and self.old_cache():
-
-            if not self.master.load_cache():
+            tmp_master = self.master.load_cache(self.master.master_file)
+            if not tmp_master:
                 self.master.download_all_hash()
+            elif 'data' in tmp_master:
+                self.master.master_bt = tmp_master['data']
+            else:
+                self.master.master_bt = tmp_master
 
-            if not self.slave.load_cache():
-                self.slave.download_ureports(self.master.master_bt)
+            for server_name, server_url in self.slave.url.items():
+                tmp_slave = self.slave.load_cache(server_name + ".json")
+                if tmp_slave:
+                    self.slave.slave_bt[server_name] = tmp_slave
+                else:
+                    self.slave.download_ureports(self.master.master_bt)
         else:
             clear_cache()
             self.master.download_all_hash()
@@ -98,7 +106,7 @@ class ACore:
             if result.total_seconds() > timedelta(minutes=minutes,
                                                   hours=hours,
                                                   days=days).total_seconds():
-                self.clear_cache()
+                clear_cache()
                 return False
 
         return True
@@ -163,6 +171,7 @@ class ACore:
     def output_step_1(self, data=None):
         if data:
             self.output_message += "RHEL-{0} Bugzilla bugs with closed Fedora Bugzilla bugs:\n".format("7")
+            self.output_message += "------------------------------------------------------\n"
 
             for key_hash, ureports in data.items():
                 known_bug_id = []
@@ -233,6 +242,7 @@ class ACore:
         # generate output for step2
         if data:
             self.output_message += "Probably fixed Bugzilla bugs in RHEL-7\n"
+            self.output_message += "--------------------------------------\n"
             for key_hash, ureport in data.items():
                 bugs = []
                 for master_bug in ureport['bugs']:
@@ -286,6 +296,7 @@ class ACore:
 
     def output_step_3(self, data=None):
         if data:
+            first_loop = True
             for key_hash, value in data.items():  # step 3 contain slave's reports
 
                 master_report = self.master.master_bt[key_hash]
@@ -307,7 +318,7 @@ class ACore:
                         b['type'] == 'BUGZILLA' and b['status'] in ['NEW', 'ASSIGNED']]
 
                 printed = []
-                first_loop = True
+
                 for b in bugs:
                     bz_bug = self.get_bzbug(b['id'])
                     if bz_bug.id in printed:
@@ -319,6 +330,7 @@ class ACore:
 
                     if first_loop:
                         self.output_message += "RHEL-{0} Bugzilla bugs probably fixed in Fedora\n".format(7)
+                        self.output_message += "---------------------------------------------\n"
                         first_loop = False
 
                     self.output_message += "*[{0}] - {1}\n".format(master_report['component'], bz_bug.summary)
@@ -359,6 +371,7 @@ class ACore:
         # Resolved Fedora Bugzilla bugs appearing in RHEL-X
         if data:
             self.output_message += "Resolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
+            self.output_message += "-------------------------------------------------\n"
             for key_hash, ureport in data.items():
                 slave = []
                 for sl in self.slave_dict[key_hash]:
@@ -425,6 +438,7 @@ class ACore:
     def output_step_5(self, data=None):
         if data:
             self.output_message += "\nTraces occurring on CentOS-{0} that are fixed in Fedora\n".format("7")
+            self.output_message += "-----------------------------------------------------\n"
             for key_hash, ureport in data.items():
                 slave_bug = [sb for sb in self.slave_dict[key_hash][0]['bugs'] if
                              sb['type'] == "BUGZILLA" and sb['resolution'] in ['ERRATA', 'NEXTRELEASE',
@@ -468,6 +482,7 @@ class ACore:
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         if data:
             self.output_message += "Traces occurring on RHEL-{0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "------------------------------------------------------------\n"
             for key_hash, ureport in data.items():
 
                 slave_pf = [spf for spf in self.slave_dict[key_hash] if spf['probably_fixed'] is not None]
@@ -523,10 +538,12 @@ class ACore:
                         strip_name_from_version(pf['nvr']))
 
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
+            self.output_message += "\n"
 
     def output_step_7(self, data=None):
         if data:
-            self.output_message += "\nTraces occurring on CentOS-{0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "Traces occurring on CentOS-{0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "--------------------------------------------------------------\n"
             for key_hash, ureport in data.items():
 
                 slave_pf = [spf for spf in self.slave_dict[key_hash] if spf['probably_fixed'] is not None]
@@ -583,6 +600,7 @@ class ACore:
         step_count_8 = 0
         if data:
             self.output_message += "\nFedora Bugzilla bugs and CentOS bugs appearing in RHEL-{0}\n".format("7")
+            self.output_message += "--------------------------------------------------------\n"
             for key_hash, ureport in data.items():
                 if step_count_8 >= 20:
                     continue

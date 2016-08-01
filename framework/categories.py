@@ -23,7 +23,7 @@ class Categories(ACore):
         self.bz_bugs = load_binary_cache("bugzilla_bug.p")
         self.components = load_binary_cache("components.p")
         
-        self.download_data()
+        self.download_server_data()
         self.agregate_master_bthash()
         self.master.download_ureport()  # Download ureports
         self.group_data_by_bt_hash()
