@@ -107,6 +107,9 @@ def date_diff(first, last):
 def bugzilla_url(bz_bug):
     if bz_bug is not False:
         status = bz_bug.status
+        if bz_bug.resolution in ['EOL', 'WONTFIX']:
+            return ""
+
         if bz_bug.status == "CLOSED":
             status += " {0}".format(bz_bug.resolution)
 
