@@ -72,9 +72,10 @@ class ACore:
         msg['Subject'] = "ABRT Mail stats"
         msg['From'] = "phelia@redhat.com"
         msg['To'] = "phelia@redhat.com"
+        recipient = ['phelia@redhat.com', 'jfilak@redhat.com']
 
         s = smtplib.SMTP('localhost')
-        s.sendmail('phelia@redhat.com', 'phelia@redhat.com', msg.as_string())
+        s.sendmail('phelia@redhat.com', "phelia@redhat.com", msg.as_string())
         s.quit()
 
     def agregate_master_bthash(self):
@@ -170,7 +171,7 @@ class ACore:
 
     def output_step_1(self, data=None):
         if data:
-            self.output_message += "RHEL-{0} Bugzilla bugs with closed Fedora Bugzilla bugs:\n".format("7")
+            self.output_message += "RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs:\n"
             self.output_message += "------------------------------------------------------\n"
 
             for key_hash, ureports in data.items():
@@ -329,7 +330,7 @@ class ACore:
                         continue
 
                     if first_loop:
-                        self.output_message += "RHEL-{0} Bugzilla bugs probably fixed in Fedora\n".format(7)
+                        self.output_message += "RHEL-7 Bugzilla bugs probably fixed in Fedora\n"
                         self.output_message += "---------------------------------------------\n"
                         first_loop = False
 
@@ -370,7 +371,7 @@ class ACore:
     def output_step_4(self, data=None):
         # Resolved Fedora Bugzilla bugs appearing in RHEL-X
         if data:
-            self.output_message += "Resolved Fedora Bugzilla bugs appearing in RHEL-{0}\n".format("7")
+            self.output_message += "Resolved Fedora Bugzilla bugs appearing on RHEL-7\n"
             self.output_message += "-------------------------------------------------\n"
             for key_hash, ureport in data.items():
                 slave = []
@@ -437,8 +438,8 @@ class ACore:
 
     def output_step_5(self, data=None):
         if data:
-            self.output_message += "\nTraces occurring on CentOS-{0} that are fixed in Fedora\n".format("7")
-            self.output_message += "-----------------------------------------------------\n"
+            self.output_message += "Resolved Fedora Bugzilla bugs appearing on CentOS-7\n"
+            self.output_message += "---------------------------------------------------\n"
             for key_hash, ureport in data.items():
                 slave_bug = [sb for sb in self.slave_dict[key_hash][0]['bugs'] if
                              sb['type'] == "BUGZILLA" and sb['resolution'] in ['ERRATA', 'NEXTRELEASE',
@@ -481,7 +482,7 @@ class ACore:
     def output_step_6(self, data=None):
         # Traces occurring on RHEL-${X} that are probably fixed in Fedora:
         if data:
-            self.output_message += "Traces occurring on RHEL-{0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "Traces occurring in RHEL-7 that are probably fixed in Fedora\n"
             self.output_message += "------------------------------------------------------------\n"
             for key_hash, ureport in data.items():
 
@@ -538,11 +539,10 @@ class ACore:
                         strip_name_from_version(pf['nvr']))
 
                     self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
-            self.output_message += "\n"
 
     def output_step_7(self, data=None):
         if data:
-            self.output_message += "Traces occurring on CentOS-{0} that are probably fixed in Fedora\n".format("7")
+            self.output_message += "Traces occurring in CentOS-7 that are probably fixed in Fedora\n"
             self.output_message += "--------------------------------------------------------------\n"
             for key_hash, ureport in data.items():
 
@@ -593,14 +593,16 @@ class ACore:
 
                     last_version = get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t- last affected version: {0}\n".format(last_version)
-                    self.output_message += "\t- {0}reports/{1}\n\n".format(self.master.url,
+                    self.output_message += "\t- {0}reports/{1}\n".format(self.master.url,
                                                                            ureport['report']['id'])  # NA BZ
 
     def output_step_8(self, data=None):
         step_count_8 = 0
         if data:
-            self.output_message += "\nFedora Bugzilla bugs and CentOS bugs appearing in RHEL-{0}\n".format("7")
-            self.output_message += "--------------------------------------------------------\n"
+            self.output_message += "Traces occurring in RHEL-7 with user " \
+                                   "details in Fedora Bugzilla bug or CentOS-7 bug\n"
+            self.output_message += "-------------------------------------" \
+                                   "----------------------------------------------\n"
             for key_hash, ureport in data.items():
                 if step_count_8 >= 20:
                     continue
