@@ -43,14 +43,16 @@ class Team(ACore):
                 strip += "="
             self.output_message += "{0}\n\n".format(strip)
 
-            self.output_step_1(team_steps['step1'])
-            self.output_step_2(team_steps['step2'])
-            self.output_step_3(team_steps['step3'])
-            self.output_step_4(team_steps['step4'])
-            self.output_step_5(team_steps['step5'])
-            self.output_step_6(team_steps['step6'])
-            self.output_step_7(team_steps['step7'])
-            self.output_step_8(team_steps['step8'])
+            self.output_step_1(team_steps['step1'])  # RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs
+            self.output_step_2(team_steps['step2'])  # Probably fixed RHEL-7 Bugzilla bugs
+            self.output_step_3(team_steps['step3'])  # RHEL-7 Bugzilla bugs probably fixed in Fedora
+            self.output_step_4(team_steps['step4'])  # Resolved Fedora Bugzilla bugs appearing on RHEL-7
+            self.output_step_5(team_steps['step5'])  # Resolved Fedora Bugzilla bugs appearing on CentOS-7
+            self.output_step_6(team_steps['step6'])  # Traces occurring in RHEL-7 that are probably fixed in Fedora
+            self.output_step_7(team_steps['step7'])  # Traces occurring in CentOS-7 that are probably fixed in Fedora
+            self.output_step_8(team_steps['step8'])  # Traces occurring in RHEL-7 with user details in
+            # Fedora Bugzilla bug or CentOS-7 bug
+
             self.output_message += "\n\n"
 
         print self.output_message
@@ -91,7 +93,7 @@ class Team(ACore):
                 if all_bugs_closed and atleast_one_new:
                     master = self.master.master_bt[bthash]
 
-                    team_name = self.create_team(master['component'], master['maintainer_contanct'])
+                    team_name = self.create_team(master['component'], master['maintainer_contact'])
 
                     self.team_data[team_name]['step1'][bthash] = self.slave_dict[bthash]
                     self.already_processed.append(bthash)
@@ -110,9 +112,10 @@ class Team(ACore):
 
                         report['report']['avg_count'] = avg_month_counter
 
-                        team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                        team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                         self.team_data[team_name]['step2'][bthash] = report
+                        self.already_processed.append(bthash)
 
         # Bugzilla bugs probably fixed in fedora
         # Step 3
@@ -139,12 +142,12 @@ class Team(ACore):
                 if not actual_bugs:
                     continue
 
-                team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                 self.team_data[team_name]['step3'][bthash] = report
                 self.already_processed.append(bthash)
 
-        # Traces occurring on RHEL-${X} that are fixed in Fedora:
+        # Traces occurring on RHEL-${X} that are fixed in Fedora
         # Step 4
         for bthash, report in self.master.master_bt.items():
             if bthash in self.already_processed:
@@ -161,7 +164,7 @@ class Team(ACore):
                     if not bugs:
                         continue
 
-                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                    team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                     self.team_data[team_name]['step4'][bthash] = report
                     self.already_processed.append(bthash)
@@ -186,7 +189,7 @@ class Team(ACore):
                     if not bugs:
                         continue
 
-                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                    team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                     self.team_data[team_name]['step5'][bthash] = report
                     self.already_processed.append(bthash)
@@ -204,7 +207,7 @@ class Team(ACore):
                     if s['probably_fixed'] is None:
                         continue
 
-                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                    team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                     self.team_data[team_name]['step6'][bthash] = report
                     self.already_processed.append(bthash)
@@ -222,7 +225,7 @@ class Team(ACore):
                     if s['probably_fixed'] is None:
                         continue
 
-                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                    team_name = self.create_team(report['component'], report['maintainer_contact'])
 
                     self.team_data[team_name]['step7'][bthash] = report
                     self.already_processed.append(bthash)
@@ -254,7 +257,7 @@ class Team(ACore):
                     if not valid:
                         continue
 
-                    team_name = self.create_team(report['component'], report['maintainer_contanct'])
+                    team_name = self.create_team(report['component'], report['maintainer_contact'])
                     self.team_data[team_name]['step8'][bthash] = report
 
     def create_team(self, component_name, user):
