@@ -8,6 +8,7 @@ class Team(ACore):
 
     teams = dict()
     team_data = dict()
+    merge_problem_id = dict()
 
     def __init__(self):
         super(Team, self).__init__()
@@ -21,6 +22,8 @@ class Team(ACore):
         self.master.download_ureport()  # Download ureports
         self.group_data_by_bt_hash()
         self.summarize_data()
+
+        self.group_by_problem_id()
         self.sort_by_count()
         self.generate_output()
 
@@ -30,11 +33,14 @@ class Team(ACore):
 
         self.save_output_to_disk()
 
-        self.send_data_to_mail()
+        #self.send_data_to_mail()
 
     def generate_output(self):
         for team_name, team_steps in self.team_data.items():
             if team_name == "UNKNOWN":
+                continue
+
+            if team_name != "Platform Hardware Enablement - RHEL":
                 continue
 
             self.output_message += "{0}\n".format(team_name)
@@ -43,14 +49,14 @@ class Team(ACore):
                 strip += "="
             self.output_message += "{0}\n\n".format(strip)
 
-            self.output_step_1(team_steps['step1'])  # RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs
-            self.output_step_2(team_steps['step2'])  # Probably fixed RHEL-7 Bugzilla bugs
-            self.output_step_3(team_steps['step3'])  # RHEL-7 Bugzilla bugs probably fixed in Fedora
-            self.output_step_4(team_steps['step4'])  # Resolved Fedora Bugzilla bugs appearing on RHEL-7
-            self.output_step_5(team_steps['step5'])  # Resolved Fedora Bugzilla bugs appearing on CentOS-7
+            #self.output_step_1(team_steps['step1'])  # RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs
+            #self.output_step_2(team_steps['step2'])  # Probably fixed RHEL-7 Bugzilla bugs
+            #self.output_step_3(team_steps['step3'])  # RHEL-7 Bugzilla bugs probably fixed in Fedora
+            #self.output_step_4(team_steps['step4'])  # Resolved Fedora Bugzilla bugs appearing on RHEL-7
+            #self.output_step_5(team_steps['step5'])  # Resolved Fedora Bugzilla bugs appearing on CentOS-7
             self.output_step_6(team_steps['step6'])  # Traces occurring in RHEL-7 that are probably fixed in Fedora
-            self.output_step_7(team_steps['step7'])  # Traces occurring in CentOS-7 that are probably fixed in Fedora
-            self.output_step_8(team_steps['step8'])  # Traces occurring in RHEL-7 with user details in
+            #self.output_step_7(team_steps['step7'])  # Traces occurring in CentOS-7 that are probably fixed in Fedora
+            #self.output_step_8(team_steps['step8'])  # Traces occurring in RHEL-7 with user details in
             # Fedora Bugzilla bug or CentOS-7 bug
 
             self.output_message += "\n\n"
@@ -280,3 +286,55 @@ class Team(ACore):
                 self.team_data[team]['step{0}'.format(x)] = dict()
 
         return team
+
+    def known_problem_id(self, problem_id, bt_hash):
+        if problem_id not in self.merge_problem_id:
+            self.merge_problem_id[problem_id] = bt_hash
+            return False
+        else:
+            return True
+
+    def group_by_problem_id(self):
+        for data in self.team_data.values():
+            for step_cnt in range(1, 9):
+                step = "step{0}".format(step_cnt)
+                self.merge_problem_id = dict()
+                for bt_hash, report in data[step].items():
+                    if self.known_problem_id(report['report']['problem_id'], bt_hash):
+                        original_report = data[step][self.merge_problem_id[report['report']['problem_id']]]
+
+                        self.merge_problems(original_report, report)
+                        del(data['step6'][bt_hash])
+                        continue
+
+    #Static move to utils
+    def merge_problems(self, original_report, duplicated_report):
+        original_report['avg_count_per_month'] += duplicated_report['avg_count_per_month']
+        original_report['report']['count'] += duplicated_report['report']['count']
+
+        org_first_occ = json_to_date(original_report['report']['first_occurrence'])
+        org_last_occ = json_to_date(original_report['report']['last_occurrence'])
+
+        dup_first_occ = json_to_date(duplicated_report['report']['first_occurrence'])
+        dup_last_occ = json_to_date(duplicated_report['report']['last_occurrence'])
+
+        if org_first_occ > dup_first_occ:
+            original_report['report']['first_occurrence'] = duplicated_report['report']['first_occurrence']
+
+        if org_last_occ < dup_last_occ:
+            original_report['report']['last_occurrence'] = duplicated_report['report']['last_occurrence']
+
+        #Merge package counts
+        for package_count in duplicated_report['package_counts']:
+            com_name = package_count[0]
+            for version in package_count[2]:
+                for original in original_report['package_counts']:
+                    if com_name == original[0]:
+                        create_new_version = True
+                        for original_version in original[2]:
+                            if original_version[0] == version[0]:
+                                original_version[1] += version[1]
+                                create_new_version = False
+
+                        if create_new_version:
+                            original[2].append(version)
