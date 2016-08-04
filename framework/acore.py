@@ -72,10 +72,10 @@ class ACore:
         msg['Subject'] = "ABRT Mail stats"
         msg['From'] = "phelia@redhat.com"
         msg['To'] = "phelia@redhat.com"
-        recipient = ['phelia@redhat.com', 'jfilak@redhat.com']
+        recipient = ['phelia@redhat.com', 'jfilak@redhat.com', 'mhabrnal@redhat.com']  # ,
 
         s = smtplib.SMTP('localhost')
-        s.sendmail('phelia@redhat.com', "phelia@redhat.com", msg.as_string())
+        s.sendmail('phelia@redhat.com', recipient, msg.as_string())
         s.quit()
 
     def agregate_master_bthash(self):
@@ -426,8 +426,12 @@ class ACore:
                             self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                                 master_report['report']['count'], master_report['avg_count_per_month'])
 
-                            self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
-                                master_report['report']['id'])
+                            if 'report_permalink' in ureport:
+                                self.output_message += "\t- https://faf-report.itos.redhat.com/problems/bthash/{0} \n".format(
+                                    ureport['report_permalink'])
+                            else:
+                                self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
+                                    master_report['report']['id'])
 
                             self.output_message += "\t- Fedora fixed in:                     {0}\n".format(
                                 strip_name_from_version(bz_bug.fixed_in))
@@ -532,13 +536,19 @@ class ACore:
                     self.output_message += "\t- latest RHEL version:                {0}\n".format(
                         self.get_rhel_latest_version(ureport['component']))
 
-                    self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
-                        master_report['report']['id'])
+                    if 'report_permalink' in ureport:
+                        self.output_message += "\t- https://faf-report.itos.redhat.com/problems/bthash/{0} \n".format(ureport['report_permalink'])
+                    else:
+                        self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
+                            master_report['report']['id'])
 
                     self.output_message += "\t- Fedora probably fixed in:           {0}\n".format(
                         strip_name_from_version(pf['nvr']))
 
-                    self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
+                    if 'report_permalink' in ureport:
+                        self.output_message += "\t- {0}problems/bthash/{1}\n\n".format(spf['source'], ureport['report_permalink'])
+                    else:
+                        self.output_message += "\t- {0}reports/{1}\n\n".format(spf['source'], spf['report']['id'])
 
     def output_step_7(self, data=None):
         if data:
@@ -584,8 +594,12 @@ class ACore:
                     self.output_message += "\t- latest RHEL version:                {0}\n".format(
                         self.get_rhel_latest_version(ureport['component']))
 
-                    self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
-                        master_report['report']['id'])
+                    if 'report_permalink' in ureport:
+                        self.output_message += "\t- https://faf-report.itos.redhat.com/problems/bthash/{0} \n".format(
+                            ureport['report_permalink'])
+                    else:
+                        self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
+                            master_report['report']['id'])
 
                     pf = spf['probably_fixed']['probable_fix_build']
 
@@ -593,7 +607,11 @@ class ACore:
 
                     last_version = get_lastes_version(ureport['package_counts'], master_report['component'])
                     self.output_message += "\t- last affected version: {0}\n".format(last_version)
-                    self.output_message += "\t- {0}reports/{1}\n".format(self.master.url,
+
+                    if 'report_permalink' in ureport:
+                        self.output_message += "\t- {0}problems/bthash/{1} \n".format(self.master.url ,ureport['report_permalink'])
+                    else:
+                        self.output_message += "\t- {0}reports/{1}\n".format(self.master.url,
                                                                            ureport['report']['id'])  # NA BZ
 
     def output_step_8(self, data=None):
@@ -639,8 +657,12 @@ class ACore:
                 self.output_message += "\t- RHEL total count:                   {0} (~{1}/month)\n".format(
                     master_report['report']['count'], master_report['avg_count_per_month'])
 
-                self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
-                    master_report['report']['id'])
+                if 'report_permalink' in ureport:
+                    self.output_message += "\t- https://faf-report.itos.redhat.com/problems/bthash/{0} \n".format(
+                        ureport['report_permalink'])
+                else:
+                    self.output_message += "\t- https://faf-report.itos.redhat.com/reports/{0}\n".format(
+                        master_report['report']['id'])
 
                 for spf in slave_pf:
                     last_slave_version = get_lastes_version(spf['package_counts'], master_report['component'])

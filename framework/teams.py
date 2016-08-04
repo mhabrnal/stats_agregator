@@ -33,14 +33,11 @@ class Team(ACore):
 
         self.save_output_to_disk()
 
-        #self.send_data_to_mail()
+        self.send_data_to_mail()
 
     def generate_output(self):
         for team_name, team_steps in self.team_data.items():
             if team_name == "UNKNOWN":
-                continue
-
-            if team_name != "Platform Hardware Enablement - RHEL":
                 continue
 
             self.output_message += "{0}\n".format(team_name)
@@ -49,14 +46,14 @@ class Team(ACore):
                 strip += "="
             self.output_message += "{0}\n\n".format(strip)
 
-            #self.output_step_1(team_steps['step1'])  # RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs
-            #self.output_step_2(team_steps['step2'])  # Probably fixed RHEL-7 Bugzilla bugs
-            #self.output_step_3(team_steps['step3'])  # RHEL-7 Bugzilla bugs probably fixed in Fedora
-            #self.output_step_4(team_steps['step4'])  # Resolved Fedora Bugzilla bugs appearing on RHEL-7
-            #self.output_step_5(team_steps['step5'])  # Resolved Fedora Bugzilla bugs appearing on CentOS-7
+            self.output_step_1(team_steps['step1'])  # RHEL-7 Bugzilla bugs with closed Fedora Bugzilla bugs
+            self.output_step_2(team_steps['step2'])  # Probably fixed RHEL-7 Bugzilla bugs
+            self.output_step_3(team_steps['step3'])  # RHEL-7 Bugzilla bugs probably fixed in Fedora
+            self.output_step_4(team_steps['step4'])  # Resolved Fedora Bugzilla bugs appearing on RHEL-7
+            self.output_step_5(team_steps['step5'])  # Resolved Fedora Bugzilla bugs appearing on CentOS-7
             self.output_step_6(team_steps['step6'])  # Traces occurring in RHEL-7 that are probably fixed in Fedora
-            #self.output_step_7(team_steps['step7'])  # Traces occurring in CentOS-7 that are probably fixed in Fedora
-            #self.output_step_8(team_steps['step8'])  # Traces occurring in RHEL-7 with user details in
+            self.output_step_7(team_steps['step7'])  # Traces occurring in CentOS-7 that are probably fixed in Fedora
+            self.output_step_8(team_steps['step8'])  # Traces occurring in RHEL-7 with user details in
             # Fedora Bugzilla bug or CentOS-7 bug
 
             self.output_message += "\n\n"
@@ -295,16 +292,25 @@ class Team(ACore):
             return True
 
     def group_by_problem_id(self):
-        for data in self.team_data.values():
-            for step_cnt in range(1, 9):
+        for data in self.team_data.values():  # All teams
+            for step_cnt in range(1, 9):  # All steps
                 step = "step{0}".format(step_cnt)
                 self.merge_problem_id = dict()
-                for bt_hash, report in data[step].items():
+                for bt_hash, report in data[step].items():  # All reports
                     if self.known_problem_id(report['report']['problem_id'], bt_hash):
-                        original_report = data[step][self.merge_problem_id[report['report']['problem_id']]]
+                        original_bt = self.merge_problem_id[report['report']['problem_id']]
+                        original_report = data[step][original_bt]
 
                         self.merge_problems(original_report, report)
-                        del(data['step6'][bt_hash])
+                        del(data[step][bt_hash])
+
+                        if 'report_permalink' not in original_report:
+                            # first initialize of permalink url
+                            original_report['report_permalink'] = "?bth={0}".format(original_bt)
+
+                        original_report['report_permalink'] += "&bth={0}".format(bt_hash)
+
+                        data[step][original_bt] = original_report
                         continue
 
     #Static move to utils
