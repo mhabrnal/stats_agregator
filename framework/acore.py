@@ -132,7 +132,12 @@ class ACore:
         else:
             bash_command = "brew latest-build rhel-7.3 {0} --quiet".format(component)
             process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-            strip_version = strip_name_from_version(process.communicate()[0].split()[0])
+
+            try:
+                strip_version = strip_name_from_version(process.communicate()[0].split()[0])
+            except:
+                strip_version = "Version wasn't found"
+
             self.components[component] = strip_version
             return strip_version
 
