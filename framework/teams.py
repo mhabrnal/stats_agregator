@@ -33,8 +33,6 @@ class Team(ACore):
 
         self.save_output_to_disk()
 
-        #self.send_data_to_mail()
-
     def generate_output(self):
         for team_name, team_steps in self.team_data.items():
             if team_name == "UNKNOWN":

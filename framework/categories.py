@@ -36,7 +36,6 @@ class Categories(ACore):
 
         self.save_output_to_disk()
 
-        # self.send_data_to_mail()
 
     def generate_output(self):
         self.output_step_1(self.step1)
