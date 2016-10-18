@@ -69,12 +69,12 @@ class ACore:
 
         msg = MIMEText(self.output_message)
 
-        msg['Subject'] = "ABRT Mail stats preview"
-        msg['From'] = "example@example.com"
-        msg['To'] = "example@example.com"
+        msg['Subject'] = config.EMAIL_SUBJECT
+        msg['From'] = config.EMAIL_FROM
+        msg['To'] = config.EMAIL_TO
 
-        s = smtplib.SMTP('localhost')
-        s.sendmail('example@example.com', config.EMAIL_RECIPIENT, msg.as_string())
+        s = smtplib.SMTP(config.EMAIL_SMTP)
+        s.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
         s.quit()
 
     def agregate_master_bthash(self):
