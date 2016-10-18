@@ -155,7 +155,7 @@ class ACore:
                 continue
 
             # We don't want sending reports
-            if master_ureport['avg_count_per_month'] <= 1:
+            if 'avg_count_per_month' not in master_ureport or master_ureport['avg_count_per_month'] <= 1:
                 self.delete_bthash(master_bt)
                 continue
 
