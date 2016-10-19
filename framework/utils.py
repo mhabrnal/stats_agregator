@@ -144,6 +144,8 @@ def watson_api(component_name, assignee):
 
 def save_cache(file_name, data):
     print "Save cache to file '{0}'".format(file_name)
+    if not os.path.isdir('cache'):
+        os.mkdir('cache')
 
     with open("cache/" + file_name, "w") as f:
         f.write(json.dumps(data))
