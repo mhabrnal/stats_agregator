@@ -71,7 +71,7 @@ class ACore:
 
         msg['Subject'] = config.EMAIL_SUBJECT
         msg['From'] = config.EMAIL_FROM
-        msg['To'] = config.EMAIL_TO
+        msg['To'] = ";".join(config.EMAIL_TO)
 
         s = smtplib.SMTP(config.EMAIL_SMTP)
         s.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
