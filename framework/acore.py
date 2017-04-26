@@ -1,5 +1,6 @@
 import subprocess
 import bugzilla
+import getpass
 from abc import ABCMeta, abstractmethod
 
 from framework.master import Master
@@ -27,6 +28,9 @@ class ACore:
         self.slave = Slave()
         self.bz = bugzilla.Bugzilla(url="https://bugzilla.redhat.com/xmlrpc.cgi",
                                     cookiefile=None)
+
+        if not config.BZ_PASSWORD or config.BZ_PASSWORD == "":
+            config.BZ_PASSWORD = getpass.getpass(prompt='Bugzilla password ({}): '.format(config.BZ_USER))
 
         self.bz.login(config.BZ_USER, config.BZ_PASSWORD)
 
