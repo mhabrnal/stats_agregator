@@ -64,7 +64,7 @@ def get_first_version(package_counts, component):
 def get_opsys(releases):
     os = []
     for r in releases:
-        os.append(re.search('^[a-zA-Z ]*', r[0]).group(0).strip(" "))
+        os.append(re.search('^[a-zA-Z ]*', r['name']).group(0).strip(" "))
     return os
 
 
