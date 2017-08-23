@@ -10,6 +10,7 @@ import sys
 from pprint import pprint
 from datetime import datetime
 from pkg_resources import parse_version
+from time import sleep
 
 
 def save_binary_cache(file_name, variable, force_write=True):
@@ -134,12 +135,12 @@ def watson_api(component_name, assignee):
         "component": component_name,
     })
 
-    while True:
+    for i in range(0, 10):
         try:
             return json.load(urllib2.urlopen(config.WATSON_URL, data))
         except urllib2.HTTPError, e:
-            print "Retrying...", e
-            pass
+            sleep(2)
+            print "Retrying {0} - {1}".format(config.WATSON_URL, e)
 
 
 def save_cache(file_name, data):
@@ -161,10 +162,11 @@ def download_data(url, data):  # TODO rename this method
                                        "Accept": "application/json"})
 
     try:
-        print "Open connection for download ureports"
+        print "Open connection for download ureports ({})".format(url)
         data = urllib2.urlopen(request)
     except urllib2.HTTPError as e:
-        print "While tring download '" + problem_url + "' we get error code: " + str(e.code)
+        print "While trying download '" + problem_url + "' we get error code: " + str(e.code)
+        print e
         sys.exit()
     else:
         json_string = data.read()
